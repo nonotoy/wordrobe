@@ -1,18 +1,16 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { SearchIcon, XIcon, ChevronLeftIcon, ChevronRightIcon, StarIcon, BookIcon } from './Icons';
+import { SearchIcon, XIcon, ChevronLeftIcon, ChevronRightIcon, StarIconCustom, MainIcon } from './Icons';
 
 export function Logo({ size = 'large', name = 'Wordrobe' }) {
   const { theme } = useApp();
   const isLarge = size === 'large';
-  const iconSize = isLarge ? 44 : 32;
+  const iconSize = isLarge ? 36 : 28;
 
   return (
     <View style={styles.logoContainer}>
-      <View style={[styles.logoDefault, { width: iconSize, height: iconSize, borderRadius: iconSize * 0.27 }]}>
-        <BookIcon color="#fff" size={iconSize * 0.55} />
-      </View>
+      <MainIcon color={theme.text} size={iconSize} />
       <Text style={[
         styles.logoText,
         { color: theme.text, fontSize: isLarge ? 24 : 18 }
@@ -61,11 +59,21 @@ export function POSBadge({ text }) {
   );
 }
 
+export function DialectBadge({ text }) {
+  const { theme } = useApp();
+  if (!text) return null;
+  return (
+    <View style={[styles.dialectBadge, { backgroundColor: theme.border }]}>
+      <Text style={[styles.dialectBadgeText, { color: theme.text }]}>{text}</Text>
+    </View>
+  );
+}
+
 export function FavoriteButton({ isFavorite, onPress, size = 24 }) {
   const { theme } = useApp();
   return (
     <TouchableOpacity onPress={onPress} style={styles.favoriteButton}>
-      <StarIcon
+      <StarIconCustom
         color={isFavorite ? theme.star : theme.starInactive}
         size={size}
         filled={isFavorite}
@@ -154,7 +162,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 14,
     gap: 12,
@@ -186,6 +194,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  dialectBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  dialectBadgeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
   favoriteButton: {
     padding: 8,
   },
@@ -195,6 +212,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     marginTop: 24,
+    marginBottom: 16,
   },
   paginationButton: {
     borderWidth: 1,

@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
-import { SearchBar, Divider, POSBadge, Pagination } from '../components/UIComponents';
+import { SearchBar, Divider, POSBadge, DialectBadge, Pagination } from '../components/UIComponents';
 import DetailScreen from './DetailScreen';
 
 export default function FavoritesScreen() {
@@ -11,6 +11,7 @@ export default function FavoritesScreen() {
     favoriteEntries,
     getWordDisplay,
     ITEMS_PER_PAGE,
+    t,
   } = useApp();
 
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -51,60 +52,66 @@ export default function FavoritesScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]} edges={[]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          <View style={styles.searchWrapper}>
-            <SearchBar
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              placeholder="お気に入りを検索..."
-            />
-          </View>
+      <View style={[styles.headerDivider, { backgroundColor: theme.border }]} />
 
-          <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-            {searchQuery ? `検索結果 (${filteredFavorites.length})` : `お気に入り (${favoriteEntries.length})`}
-          </Text>
+      <View style={styles.searchWrapper}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={handleSearchChange}
+          placeholder={t('searchFavoritesPlaceholder')}
+        />
+      </View>
 
-          {favoriteEntries.length === 0 ? (
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              お気に入りはまだありません
-            </Text>
-          ) : paginatedFavorites.length === 0 && searchQuery ? (
-            <Text style={[styles.noResults, { color: theme.textSecondary }]}>
-              「{searchQuery}」に一致するお気に入りが見つかりません
-            </Text>
-          ) : (
-            <>
-              {paginatedFavorites.map((entry, index) => (
-                <View key={entry.id}>
-                  <TouchableOpacity
-                    onPress={() => handleSelectEntry(entry)}
-                    style={styles.wordCard}
-                  >
-                    <Text style={[styles.wordText, { color: theme.text }]}>
-                      {getWordDisplay(entry)}
-                    </Text>
-                    <View style={styles.wordMeta}>
-                      <POSBadge text={entry.pos} />
-                      <Text style={[styles.meaningText, { color: theme.textSecondary }]}>
-                        {entry.meaning}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                  {index < paginatedFavorites.length - 1 && <Divider marginY={4} />}
+      <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
+        {searchQuery ? `${t('favoritesSearchResults')} (${filteredFavorites.length})` : `${t('allFavorites')} (${favoriteEntries.length})`}
+      </Text>
+
+      {favoriteEntries.length === 0 ? (
+        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+          {t('noFavorites')}
+        </Text>
+      ) : paginatedFavorites.length === 0 && searchQuery ? (
+        <Text style={[styles.noResults, { color: theme.textSecondary }]}>
+          {t('noFavoritesMatch', { query: searchQuery })}
+        </Text>
+      ) : (
+        <FlatList
+          data={paginatedFavorites}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item, index }) => (
+            <View>
+              <TouchableOpacity
+                onPress={() => handleSelectEntry(item)}
+                style={styles.wordCard}
+              >
+                <View style={styles.wordRow}>
+                  <Text style={[styles.wordText, { color: theme.text }]}>
+                    {getWordDisplay(item)}
+                  </Text>
+                  <DialectBadge text={item.dialect} />
                 </View>
-              ))}
-
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                totalItems={filteredFavorites.length}
-              />
-            </>
+                <View style={styles.wordMeta}>
+                  <POSBadge text={item.pos} />
+                  <Text style={[styles.meaningText, { color: theme.textSecondary }]}>
+                    {item.meaning}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              {index < paginatedFavorites.length - 1 && <Divider marginY={4} />}
+            </View>
           )}
-        </View>
-      </ScrollView>
+          style={styles.listContainer}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredFavorites.length}
+      />
 
       <Modal
         visible={showDetail}
@@ -128,21 +135,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 24,
+  headerDivider: {
+    height: 1,
   },
   searchWrapper: {
-    marginTop: 0,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   sectionHeader: {
     fontSize: 15,
     fontWeight: '500',
     marginTop: 16,
     marginBottom: 12,
+    paddingHorizontal: 20,
+  },
+  listContainer: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
   emptyText: {
     textAlign: 'center',
@@ -157,10 +169,16 @@ const styles = StyleSheet.create({
   wordCard: {
     paddingVertical: 12,
   },
+  wordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   wordText: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
+    flex: 1,
   },
   wordMeta: {
     flexDirection: 'row',

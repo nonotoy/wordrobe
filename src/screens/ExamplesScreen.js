@@ -10,6 +10,7 @@ export default function ExamplesScreen() {
     sentences,
     getSentenceDisplay,
     ITEMS_PER_PAGE,
+    t,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,17 +46,17 @@ export default function ExamplesScreen() {
             <SearchBar
               value={searchQuery}
               onChangeText={handleSearchChange}
-              placeholder="例文を検索..."
+              placeholder={t('searchExamplesPlaceholder')}
             />
           </View>
 
           <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-            {searchQuery ? `検索結果 (${filteredSentences.length})` : `例文 (${sentences.length})`}
+            {searchQuery ? `${t('examplesSearchResults')} (${filteredSentences.length})` : `${t('allExamples')} (${sentences.length})`}
           </Text>
 
           {paginatedSentences.length === 0 && searchQuery ? (
             <Text style={[styles.noResults, { color: theme.textSecondary }]}>
-              「{searchQuery}」に一致する例文が見つかりません
+              {t('noExamplesMatch', { query: searchQuery })}
             </Text>
           ) : (
             paginatedSentences.map((sentence, index) => (

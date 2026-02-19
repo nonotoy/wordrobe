@@ -1,10 +1,31 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseCSV, parseEntriesFromCSV, parseSentencesFromCSV } from '../utils/csvParser';
+import { getTranslation } from '../i18n/translations';
 
 const AppContext = createContext();
 
-const ITEMS_PER_PAGE = 20;
+// Calculate items per page based on screen height
+const calculateItemsPerPage = () => {
+  const { height } = Dimensions.get('window');
+  // Estimated fixed heights:
+  // - Navigation header: ~44px
+  // - Header divider: ~1px
+  // - Search bar with padding: ~80px
+  // - Section header: ~48px
+  // - Pagination: ~60px
+  // - Tab bar: ~84px (64px + average safe area bottom ~20px)
+  // - List content padding: ~16px
+  // Total: ~333px
+  const fixedHeight = 333;
+  const itemHeight = 70; // Card (paddingVertical 24 + content ~40) + divider (~8)
+  const availableHeight = height - fixedHeight;
+  const itemsPerPage = Math.floor(availableHeight / itemHeight);
+  return Math.max(5, Math.min(itemsPerPage, 20)); // Between 5 and 20 items
+};
+
+const ITEMS_PER_PAGE = calculateItemsPerPage();
 
 const lightTheme = {
   bg: '#ffffff',
@@ -13,9 +34,9 @@ const lightTheme = {
   textSecondary: '#6b7280',
   textTertiary: '#9ca3af',
   border: '#e5e7eb',
-  accent: '#1e3a5f',
-  accentLight: '#e8eef5',
-  accentText: '#1e3a5f',
+  accent: '#FF6600',
+  accentLight: '#fff3e6',
+  accentText: '#FF6600',
   star: '#f59e0b',
   starInactive: '#d1d5db',
   disabled: '#d1d5db',
@@ -32,9 +53,9 @@ const darkTheme = {
   textSecondary: '#8e8e93',
   textTertiary: '#5c5c63',
   border: '#2c2c2e',
-  accent: '#1e3a5f',
-  accentLight: '#2d4a6f',
-  accentText: '#e8eef5',
+  accent: '#FF6600',
+  accentLight: '#4d2200',
+  accentText: '#ffcc99',
   star: '#f59e0b',
   starInactive: '#3f3f46',
   disabled: '#3f3f46',
@@ -45,20 +66,33 @@ const darkTheme = {
 };
 
 // デフォルトの辞書テンプレート
-const createEmptyDictionary = (id, name) => ({
-  id,
-  name,
-  iconImage: null,
-  entries: [],
-  sentences: [],
-  favorites: [],
-  dataSources: [],
-});
+const createEmptyDictionary = (id, options) => {
+  const name = typeof options === 'string' ? options : options.name;
+  const language1 = typeof options === 'object' ? options.language1 : null;
+  const language2 = typeof options === 'object' ? options.language2 : null;
+  const language1Code = typeof options === 'object' ? options.language1Code : null;
+  const language2Code = typeof options === 'object' ? options.language2Code : null;
+
+  return {
+    id,
+    name,
+    language1,
+    language2,
+    language1Code,
+    language2Code,
+    iconImage: null,
+    entries: [],
+    sentences: [],
+    favorites: [],
+    dataSources: [],
+  };
+};
 
 export function AppProvider({ children }) {
   // グローバル設定
   const [darkMode, setDarkMode] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('ja');
+  const [isLoading, setIsLoading] = useState(false);
 
   // 辞書データ
   const [dictionaries, setDictionaries] = useState([]);
@@ -71,6 +105,11 @@ export function AppProvider({ children }) {
   const [favoritesPage, setFavoritesPage] = useState(1);
 
   const theme = darkMode ? darkTheme : lightTheme;
+
+  // Translation function
+  const t = useCallback((key, variables = {}) => {
+    return getTranslation(selectedLanguage, key, variables);
+  }, [selectedLanguage]);
 
   // 現在の辞書を取得
   const currentDictionary = dictionaries.find(d => d.id === currentDictionaryId) || null;
@@ -129,8 +168,9 @@ export function AppProvider({ children }) {
   };
 
   // 辞書操作
-  const addDictionary = async (name) => {
-    const newDictionary = createEmptyDictionary(Date.now().toString(), name);
+  const addDictionary = async (options) => {
+    // options can be a string (name) or an object with name, language1, language2, etc.
+    const newDictionary = createEmptyDictionary(Date.now().toString(), options);
     const newDictionaries = [...dictionaries, newDictionary];
     await saveDictionaries(newDictionaries);
     return newDictionary;
@@ -186,11 +226,14 @@ export function AppProvider({ children }) {
   const dataSources = currentDictionary?.dataSources || [];
 
   const filteredEntries = searchQuery
-    ? entries.filter(entry =>
-        entry.src_primary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (entry.src_secondary && entry.src_secondary.includes(searchQuery)) ||
-        entry.meaning.includes(searchQuery)
-      )
+    ? entries.filter(entry => {
+        const query = searchQuery.toLowerCase();
+        return (
+          entry.src_primary.toLowerCase().includes(query) ||
+          (entry.src_secondary && entry.src_secondary.toLowerCase().includes(query)) ||
+          entry.meaning.toLowerCase().includes(query)
+        );
+      })
     : entries;
 
   const favoriteEntries = entries.filter(entry => favorites.includes(entry.id));
@@ -208,14 +251,37 @@ export function AppProvider({ children }) {
   const getSentenceDisplay = (sentence) => sentence.sentence_primary;
 
   const getExamplesForWord = (entry) => {
-    const word = entry.src_primary.toLowerCase();
-    return sentences
+    // 検索ワードを収集: src_primary + conjugation/declension/allomorphの全値
+    const searchWords = new Set();
+    searchWords.add(entry.src_primary.toLowerCase());
+
+    const extractValues = (obj) => {
+      if (!obj) return;
+      if (typeof obj === 'string') {
+        searchWords.add(obj.toLowerCase());
+      } else if (Array.isArray(obj)) {
+        obj.forEach(v => extractValues(v));
+      } else if (typeof obj === 'object') {
+        Object.values(obj).forEach(v => extractValues(v));
+      }
+    };
+
+    extractValues(entry.conjugation);
+    extractValues(entry.declension);
+    extractValues(entry.allomorph);
+
+    // 全辞書の例文を横断検索
+    const allSentences = dictionaries.flatMap(d => d.sentences || []);
+
+    // id重複排除しながらマッチする例文を返す
+    const seen = new Set();
+    return allSentences
       .filter(s => {
-        if (!s.sentence_primary.toLowerCase().includes(word)) return false;
-        // dataSourceIdがある場合、同じデータソースの例文のみ表示
-        if (entry.dataSourceId && s.dataSourceId) {
-          return entry.dataSourceId === s.dataSourceId;
-        }
+        const sentence = s.sentence_primary?.toLowerCase();
+        if (!sentence) return false;
+        if (![...searchWords].some(word => sentence.includes(word))) return false;
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
         return true;
       })
       .slice(0, 15);
@@ -295,7 +361,9 @@ export function AppProvider({ children }) {
     // Global settings
     darkMode,
     selectedLanguage,
+    isLoading,
     theme,
+    t,
     setDarkMode: saveDarkMode,
     setSelectedLanguage: saveLanguage,
 

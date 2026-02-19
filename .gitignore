@@ -1,0 +1,11 @@
+node_modules
+.DS_Store
+.expo
+*.log
+.vscode
+.idea
+.csv
+dic_kayano.json
+dic_nakagawa.json
+iku.json
+iku.json.bak

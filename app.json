@@ -4,30 +4,31 @@
     "slug": "wordrobe",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon-1024.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/app-icon-1024.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1e3a5f"
+      "backgroundColor": "#FF6600"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wordrobe.dictionary"
+      "bundleIdentifier": "com.wordrobe.dictionary",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.wordrobe.dictionary",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1e3a5f"
-      },
-      "package": "com.wordrobe.dictionary"
+        "foregroundImage": "./assets/app-icon-1024.png",
+        "backgroundColor": "#FF6600"
+      }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
+    "web": {},
     "extra": {
       "eas": {
         "projectId": "cd9155d3-8ba3-4724-b5d4-8983eb422097"

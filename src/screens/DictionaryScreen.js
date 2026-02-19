@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
-import { SearchBar, Divider, POSBadge, Pagination } from '../components/UIComponents';
+import { SearchBar, Divider, POSBadge, DialectBadge, Pagination } from '../components/UIComponents';
 import DetailScreen from './DetailScreen';
+
+// Card height = paddingVertical 12*2 + wordText ~20 + wordRow marginBottom 4 + wordMeta ~20 = 68
+// Divider height = marginVertical 4*2 + height 1 = 9
+const CARD_HEIGHT = 68;
+const DIVIDER_HEIGHT = 9;
 
 export default function DictionaryScreen() {
   const {
@@ -11,15 +16,29 @@ export default function DictionaryScreen() {
     searchQuery,
     setSearchQuery,
     filteredEntries,
-    paginatedHomeEntries,
-    homePage,
-    setHomePage,
-    homeTotalPages,
-    getWordDisplay,
+    t,
   } = useApp();
 
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [listHeight, setListHeight] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const itemsPerPage = listHeight > 0
+    ? Math.max(1, Math.floor((listHeight + DIVIDER_HEIGHT) / (CARD_HEIGHT + DIVIDER_HEIGHT)))
+    : 5;
+
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / itemsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedEntries = filteredEntries.slice(
+    (safeCurrentPage - 1) * itemsPerPage,
+    safeCurrentPage * itemsPerPage
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const handleSelectEntry = (entry) => {
     setSelectedEntry(entry);
@@ -32,41 +51,53 @@ export default function DictionaryScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]} edges={[]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          <View style={styles.searchWrapper}>
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="単語を検索..."
-            />
-          </View>
+      <View style={[styles.headerDivider, { backgroundColor: theme.border }]} />
 
-          <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-            {searchQuery ? `検索結果 (${filteredEntries.length})` : `最近 (${filteredEntries.length})`}
+      <View style={styles.searchWrapper}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={t('searchPlaceholder')}
+        />
+      </View>
+
+      <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
+        {searchQuery
+          ? `${t('searchResults')} (${Math.max(0, filteredEntries.length - 1)})`
+          : `${t('recent')} (${Math.max(0, filteredEntries.length - 1)})`}
+      </Text>
+
+      <View
+        style={styles.listContainer}
+        onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
+      >
+        {paginatedEntries.length === 0 && searchQuery ? (
+          <Text style={[styles.noResults, { color: theme.textSecondary }]}>
+            {t('noResults', { query: searchQuery })}
           </Text>
-
-          {paginatedHomeEntries.length === 0 && searchQuery ? (
-            <Text style={[styles.noResults, { color: theme.textSecondary }]}>
-              「{searchQuery}」に一致する単語が見つかりません
-            </Text>
-          ) : (
-            paginatedHomeEntries.map((entry, index) => (
-              <View key={entry.id}>
-                <WordCard entry={entry} onPress={() => handleSelectEntry(entry)} />
-                {index < paginatedHomeEntries.length - 1 && <Divider marginY={4} />}
+        ) : (
+          <FlatList
+            data={paginatedEntries}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => (
+              <View>
+                <WordCard entry={item} onPress={() => handleSelectEntry(item)} />
+                {index < paginatedEntries.length - 1 && <Divider marginY={4} />}
               </View>
-            ))
-          )}
-
-          <Pagination
-            currentPage={homePage}
-            totalPages={homeTotalPages}
-            onPageChange={setHomePage}
-            totalItems={filteredEntries.length}
+            )}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={false}
           />
-        </View>
-      </ScrollView>
+        )}
+      </View>
+
+      <Pagination
+        currentPage={safeCurrentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredEntries.length}
+      />
 
       <Modal
         visible={showDetail}
@@ -91,9 +122,12 @@ function WordCard({ entry, onPress }) {
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.wordCard}>
-      <Text style={[styles.wordText, { color: theme.text }]}>
-        {getWordDisplay(entry)}
-      </Text>
+      <View style={styles.wordRow}>
+        <Text style={[styles.wordText, { color: theme.text }]}>
+          {getWordDisplay(entry)}
+        </Text>
+        <DialectBadge text={entry.dialect} />
+      </View>
       <View style={styles.wordMeta}>
         <POSBadge text={entry.pos} />
         <Text style={[styles.meaningText, { color: theme.textSecondary }]}>
@@ -108,21 +142,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 24,
+  headerDivider: {
+    height: 1,
   },
   searchWrapper: {
-    marginTop: 0,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   sectionHeader: {
     fontSize: 15,
     fontWeight: '500',
     marginTop: 16,
     marginBottom: 12,
+    paddingHorizontal: 20,
+  },
+  listContainer: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 20,
   },
   noResults: {
     textAlign: 'center',
@@ -132,17 +170,25 @@ const styles = StyleSheet.create({
   wordCard: {
     paddingVertical: 12,
   },
+  wordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   wordText: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
+    flex: 1,
   },
   wordMeta: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
   },
   meaningText: {
     fontSize: 15,
+    flex: 1,
+    flexShrink: 1,
   },
 });

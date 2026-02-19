@@ -17,7 +17,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useApp } from '../context/AppContext';
 import { Divider } from '../components/UIComponents';
-import { CheckIcon, BookIcon, XIcon, FolderIcon } from '../components/Icons';
+import { CheckIcon, XIcon, FolderIcon, BooksIcon, RenameIcon, PictureIcon, EarthAsiaIcon, SimpleBookIcon } from '../components/Icons';
+import { resolveLanguageName, isValidISO639_3 } from '../utils/languages';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -26,12 +27,12 @@ export default function SettingsScreen() {
     currentDictionary,
     dataSources,
     updateDictionary,
+    t,
   } = useApp();
 
   const [showAddSource, setShowAddSource] = useState(false);
   const [newSourceName, setNewSourceName] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [newSourceType, setNewSourceType] = useState('both');
   const [loading, setLoading] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [dictionaryName, setDictionaryName] = useState('');
@@ -39,7 +40,19 @@ export default function SettingsScreen() {
   const [selectedForDelete, setSelectedForDelete] = useState([]);
   const [editingSource, setEditingSource] = useState(null);
   const [editSourceName, setEditSourceName] = useState('');
-  const [editSourceType, setEditSourceType] = useState('both');
+  const [editingLanguages, setEditingLanguages] = useState(false);
+  const [language1Input, setLanguage1Input] = useState('');
+  const [language2Input, setLanguage2Input] = useState('');
+
+  const typeLabel = (type) => {
+    switch (type) {
+      case 'both': return t('both');
+      case 'dictionary': return t('dictionary');
+      case 'sentences': return t('sentences');
+      case 'localization': return t('localization');
+      default: return type;
+    }
+  };
 
   const handleSaveName = async () => {
     if (!dictionaryName.trim() || !currentDictionary) return;
@@ -47,12 +60,34 @@ export default function SettingsScreen() {
     setEditingName(false);
   };
 
+  const handleSaveLanguages = async () => {
+    if (!currentDictionary) return;
+    // Both languages are required
+    if (!language1Input.trim() || !language2Input.trim()) {
+      Alert.alert(t('error'), t('languagesRequired'));
+      return;
+    }
+
+    const resolvedLang1 = resolveLanguageName(language1Input);
+    const resolvedLang2 = resolveLanguageName(language2Input);
+    const isLang1Code = isValidISO639_3(language1Input);
+    const isLang2Code = isValidISO639_3(language2Input);
+
+    await updateDictionary(currentDictionary.id, {
+      language1: resolvedLang1 || language1Input.trim(),
+      language2: resolvedLang2 || language2Input.trim(),
+      language1Code: isLang1Code ? language1Input.toLowerCase().trim() : null,
+      language2Code: isLang2Code ? language2Input.toLowerCase().trim() : null,
+    });
+    setEditingLanguages(false);
+  };
+
   const handlePickImage = async () => {
     if (!currentDictionary) return;
 
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('権限エラー', '画像ライブラリへのアクセス権限が必要です');
+      Alert.alert(t('permissionError'), t('imagePermissionMessage'));
       return;
     }
 
@@ -79,11 +114,11 @@ export default function SettingsScreen() {
       // Already in delete mode - confirm deletion
       if (selectedForDelete.length > 0) {
         Alert.alert(
-          'データソースを削除',
-          `${selectedForDelete.length}件のデータソースを削除しますか？`,
+          t('deleteDataSources'),
+          t('deleteDataSourcesConfirm', { count: selectedForDelete.length }),
           [
             {
-              text: 'キャンセル',
+              text: t('cancel'),
               style: 'cancel',
               onPress: () => {
                 setDeleteMode(false);
@@ -91,7 +126,7 @@ export default function SettingsScreen() {
               },
             },
             {
-              text: '削除',
+              text: t('delete'),
               style: 'destructive',
               onPress: async () => {
                 const newDataSources = dataSources.filter(
@@ -162,7 +197,7 @@ export default function SettingsScreen() {
       const newSource = {
         id: Date.now().toString(),
         name: newSourceName,
-        type: newSourceType,
+        type: 'dictionary',
         fileName: selectedFile.name,
         enabled: true,
       };
@@ -210,16 +245,6 @@ export default function SettingsScreen() {
     return 0;
   });
 
-  const typeLabel = (type) => {
-    switch (type) {
-      case 'both': return '辞書+例文';
-      case 'dictionary': return '辞書';
-      case 'sentences': return '例文';
-      case 'localization': return '表示言語';
-      default: return type;
-    }
-  };
-
   const typeColors = (type) => {
     switch (type) {
       case 'both': return { bg: theme.accentLight, text: theme.accentText };
@@ -233,14 +258,13 @@ export default function SettingsScreen() {
   const handleEditSource = (source) => {
     setEditingSource(source);
     setEditSourceName(source.name);
-    setEditSourceType(source.type);
   };
 
   const handleSaveSourceEdit = async () => {
     if (!editingSource || !editSourceName.trim()) return;
     const newDataSources = dataSources.map(s =>
       s.id === editingSource.id
-        ? { ...s, name: editSourceName.trim(), type: editSourceType }
+        ? { ...s, name: editSourceName.trim() }
         : s
     );
     await updateDictionary(currentDictionary.id, { dataSources: newDataSources });
@@ -267,21 +291,25 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]} edges={[]}>
+      <View style={[styles.headerDivider, { backgroundColor: theme.border }]} />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Data Sources */}
           <View style={[styles.section, { marginBottom: 36 }]}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-                データソース
-              </Text>
+              <View style={styles.sectionTitleContainer}>
+                <BooksIcon color={theme.textSecondary} size={16} />
+                <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                  {t('dataSources')}
+                </Text>
+              </View>
               <View style={styles.headerButtons}>
                 {!deleteMode && (
                   <TouchableOpacity
                     onPress={() => setShowAddSource(!showAddSource)}
                     style={[styles.addButton, { backgroundColor: theme.accent }]}
                   >
-                    <Text style={styles.addButtonText}>+ 追加</Text>
+                    <Text style={styles.addButtonText}>+ {t('add')}</Text>
                   </TouchableOpacity>
                 )}
                 {sortedDataSources.length > 0 && (
@@ -301,7 +329,7 @@ export default function SettingsScreen() {
                         size={14}
                       />
                     ) : (
-                      <TrashIcon
+                      <XIcon
                         color={deleteMode && selectedForDelete.length > 0 ? '#fff' : theme.textSecondary}
                         size={14}
                       />
@@ -312,7 +340,7 @@ export default function SettingsScreen() {
                         color: deleteMode && selectedForDelete.length > 0 ? '#fff' : (deleteMode ? '#dc2626' : theme.textSecondary)
                       }
                     ]}>
-                      {deleteMode ? (selectedForDelete.length > 0 ? '削除する' : 'キャンセル') : '削除'}
+                      {deleteMode ? (selectedForDelete.length > 0 ? t('deleteConfirm') : t('cancel')) : t('delete')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -324,33 +352,10 @@ export default function SettingsScreen() {
                 <TextInput
                   value={newSourceName}
                   onChangeText={setNewSourceName}
-                  placeholder="名前"
+                  placeholder={t('name')}
                   placeholderTextColor={theme.textTertiary}
                   style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 />
-
-                <View style={styles.typeButtons}>
-                  {['both', 'dictionary', 'sentences'].map(type => (
-                    <TouchableOpacity
-                      key={type}
-                      onPress={() => setNewSourceType(type)}
-                      style={[
-                        styles.typeButton,
-                        {
-                          borderColor: newSourceType === type ? theme.accent : theme.border,
-                          backgroundColor: newSourceType === type ? theme.accentLight : 'transparent',
-                        }
-                      ]}
-                    >
-                      <Text style={[
-                        styles.typeButtonText,
-                        { color: newSourceType === type ? theme.accentText : theme.textSecondary }
-                      ]}>
-                        {typeLabel(type)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
 
                 <TouchableOpacity
                   onPress={handlePickFile}
@@ -359,11 +364,11 @@ export default function SettingsScreen() {
                 >
                   <FolderIcon color={theme.textSecondary} size={20} />
                   <Text style={[styles.filePickerText, { color: selectedFile ? theme.text : theme.textTertiary }]}>
-                    {selectedFile ? selectedFile.name : 'ファイルを選択...'}
+                    {selectedFile ? selectedFile.name : t('selectFile')}
                   </Text>
                 </TouchableOpacity>
                 <Text style={[styles.filePickerHint, { color: theme.textTertiary }]}>
-                  Google Drive、iCloud、端末内のJSONファイルを選択できます
+                  {t('filePickerHint')}
                 </Text>
 
                 <View style={styles.formButtons}>
@@ -376,7 +381,7 @@ export default function SettingsScreen() {
                     disabled={loading}
                   >
                     <Text style={[styles.cancelText, { color: theme.textSecondary }]}>
-                      キャンセル
+                      {t('cancel')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -394,7 +399,7 @@ export default function SettingsScreen() {
                     {loading ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={styles.submitButtonText}>追加</Text>
+                      <Text style={styles.submitButtonText}>{t('add')}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -403,7 +408,7 @@ export default function SettingsScreen() {
 
             {sortedDataSources.length === 0 ? (
               <Text style={[styles.noDataText, { color: theme.textTertiary }]}>
-                データソースがありません
+                {t('noDataSources')}
               </Text>
             ) : (
               sortedDataSources.map((source, index) => (
@@ -418,29 +423,7 @@ export default function SettingsScreen() {
                         style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                         autoFocus
                       />
-                      <View style={styles.typeButtons}>
-                        {['both', 'dictionary', 'sentences'].map(type => (
-                          <TouchableOpacity
-                            key={type}
-                            onPress={() => setEditSourceType(type)}
-                            style={[
-                              styles.typeButton,
-                              {
-                                borderColor: editSourceType === type ? theme.accent : theme.border,
-                                backgroundColor: editSourceType === type ? theme.accentLight : 'transparent',
-                              }
-                            ]}
-                          >
-                            <Text style={[
-                              styles.typeButtonText,
-                              { color: editSourceType === type ? theme.accentText : theme.textSecondary }
-                            ]}>
-                              {typeLabel(type)}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      <Text style={[styles.fileNameDisplay, { color: theme.textTertiary }]}>
+                      <Text style={[styles.fileNameDisplay, { color: theme.textTertiary, marginTop: 8 }]}>
                         {source.fileName || source.url || ''}
                       </Text>
                       <View style={styles.formButtons}>
@@ -485,22 +468,9 @@ export default function SettingsScreen() {
                         </View>
                       )}
                       <View style={[styles.sourceInfo, { flex: 1 }]}>
-                        <View style={styles.sourceNameRow}>
-                          <Text style={[styles.sourceName, { color: theme.text }]}>
-                            {source.name}
-                          </Text>
-                          <View style={[
-                            styles.typeBadge,
-                            { backgroundColor: typeColors(source.type).bg }
-                          ]}>
-                            <Text style={[
-                              styles.typeBadgeText,
-                              { color: typeColors(source.type).text }
-                            ]}>
-                              {typeLabel(source.type)}
-                            </Text>
-                          </View>
-                        </View>
+                        <Text style={[styles.sourceName, { color: theme.text, marginBottom: 4 }]}>
+                          {source.name}
+                        </Text>
                         <Text
                           style={[styles.sourceURL, { color: theme.textTertiary }]}
                           numberOfLines={1}
@@ -518,9 +488,12 @@ export default function SettingsScreen() {
 
           {/* Dictionary Name */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-              辞書名
-            </Text>
+            <View style={[styles.sectionTitleContainer, { marginBottom: 12 }]}>
+              <RenameIcon color={theme.textSecondary} size={16} />
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                {t('dictionaryName')}
+              </Text>
+            </View>
             {editingName ? (
               <View style={[styles.editNameForm, { backgroundColor: theme.bgSecondary }]}>
                 <TextInput
@@ -532,7 +505,7 @@ export default function SettingsScreen() {
                 <View style={styles.formButtons}>
                   <TouchableOpacity onPress={() => setEditingName(false)}>
                     <Text style={[styles.cancelText, { color: theme.textSecondary }]}>
-                      キャンセル
+                      {t('cancel')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -547,7 +520,7 @@ export default function SettingsScreen() {
                       }
                     ]}
                   >
-                    <Text style={styles.submitButtonText}>保存</Text>
+                    <Text style={styles.submitButtonText}>{t('save')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -562,45 +535,128 @@ export default function SettingsScreen() {
                 <Text style={[styles.settingText, { color: theme.text }]}>
                   {currentDictionary?.name}
                 </Text>
-                <Text style={[styles.editLabel, { color: theme.accent }]}>変更</Text>
+                <Text style={[styles.editLabel, { color: theme.accent }]}>
+{t('change')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Languages */}
+          <View style={styles.section}>
+            <View style={[styles.sectionTitleContainer, { marginBottom: 12 }]}>
+              <EarthAsiaIcon color={theme.textSecondary} size={16} />
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                {t('languages')}
+              </Text>
+            </View>
+            {editingLanguages ? (
+              <View style={[styles.editNameForm, { backgroundColor: theme.bgSecondary }]}>
+                <Text style={[styles.languageLabel, { color: theme.textSecondary }]}>
+                  {t('sourceLanguage')}
+                </Text>
+                <TextInput
+                  value={language1Input}
+                  onChangeText={setLanguage1Input}
+                  placeholder={t('sourceLanguagePlaceholder')}
+                  placeholderTextColor={theme.textTertiary}
+                  style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                  autoFocus
+                />
+                {isValidISO639_3(language1Input) && resolveLanguageName(language1Input) && (
+                  <Text style={[styles.resolvedLanguageHint, { color: theme.accent }]}>
+                    → {resolveLanguageName(language1Input)}
+                  </Text>
+                )}
+                <Text style={[styles.languageLabel, { color: theme.textSecondary, marginTop: 8 }]}>
+                  {t('targetLanguage')}
+                </Text>
+                <TextInput
+                  value={language2Input}
+                  onChangeText={setLanguage2Input}
+                  placeholder={t('targetLanguagePlaceholder')}
+                  placeholderTextColor={theme.textTertiary}
+                  style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+                />
+                {isValidISO639_3(language2Input) && resolveLanguageName(language2Input) && (
+                  <Text style={[styles.resolvedLanguageHint, { color: theme.accent }]}>
+                    → {resolveLanguageName(language2Input)}
+                  </Text>
+                )}
+                <Text style={[styles.languageHint, { color: theme.textTertiary }]}>
+                  {t('languageCodeHint')}
+                </Text>
+                <View style={styles.formButtons}>
+                  <TouchableOpacity onPress={() => setEditingLanguages(false)}>
+                    <Text style={[styles.cancelText, { color: theme.textSecondary }]}>
+                      {t('cancel')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleSaveLanguages}
+                    disabled={!language1Input.trim() || !language2Input.trim()}
+                    style={[
+                      styles.submitButton,
+                      {
+                        backgroundColor: (!language1Input.trim() || !language2Input.trim())
+                          ? theme.disabled
+                          : theme.accent
+                      }
+                    ]}
+                  >
+                    <Text style={styles.submitButtonText}>{t('save')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => {
+                  setLanguage1Input(currentDictionary?.language1 || '');
+                  setLanguage2Input(currentDictionary?.language2 || '');
+                  setEditingLanguages(true);
+                }}
+                style={[styles.settingRow, { backgroundColor: theme.bgSecondary }]}
+              >
+                <Text style={[styles.settingText, { color: theme.text }]}>
+                  {currentDictionary?.language1 || '—'} ↔︎ {currentDictionary?.language2 || '—'}
+                </Text>
+                <Text style={[styles.editLabel, { color: theme.accent }]}>
+                  {t('change')}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
 
           {/* Icon Image */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-              辞書アイコン
-            </Text>
-            <View style={[styles.imagePickerContainer, { backgroundColor: theme.bgSecondary }]}>
-              <View style={styles.imagePreview}>
+            <View style={[styles.sectionTitleContainer, { marginBottom: 12 }]}>
+              <PictureIcon color={theme.textSecondary} size={16} />
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                {t('dictionaryIcon')}
+              </Text>
+            </View>
+            <View style={[styles.settingRow, { backgroundColor: theme.bgSecondary }]}>
+              <View style={styles.iconRowContent}>
                 {currentDictionary?.iconImage ? (
                   <Image
                     source={{ uri: currentDictionary.iconImage }}
-                    style={styles.previewImage}
+                    style={styles.iconRowImage}
                   />
                 ) : (
-                  <View style={[styles.previewIconPlaceholder, { backgroundColor: theme.accent }]}>
-                    <BookIcon color="#fff" size={24} />
+                  <View style={styles.iconRowPlaceholder}>
+                    <SimpleBookIcon color={theme.textSecondary} size={20} />
                   </View>
                 )}
               </View>
-              <View style={styles.imageActions}>
-                <TouchableOpacity
-                  onPress={handlePickImage}
-                  style={[styles.imageButton, { backgroundColor: theme.accent }]}
-                >
-                  <Text style={styles.imageButtonText}>
-                    {currentDictionary?.iconImage ? '画像を変更' : '画像を選択'}
+              <View style={styles.iconRowActions}>
+                <TouchableOpacity onPress={handlePickImage}>
+                  <Text style={[styles.editLabel, { color: theme.accent }]}>
+                    {currentDictionary?.iconImage ? t('change') : t('select')}
                   </Text>
                 </TouchableOpacity>
                 {currentDictionary?.iconImage && (
-                  <TouchableOpacity
-                    onPress={handleRemoveImage}
-                    style={[styles.imageButton, { borderColor: theme.border, borderWidth: 1 }]}
-                  >
-                    <Text style={[styles.imageButtonTextSecondary, { color: theme.textSecondary }]}>
-                      画像を削除
+                  <TouchableOpacity onPress={handleRemoveImage} style={{ marginLeft: 12 }}>
+                    <Text style={[styles.editLabel, { color: theme.textSecondary }]}>
+                      {t('delete')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -617,6 +673,9 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerDivider: {
+    height: 1,
   },
   scrollView: {
     flex: 1,
@@ -666,9 +725,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   sectionTitle: {
     fontSize: 15,
-    marginBottom: 12,
   },
   noDataText: {
     fontSize: 14,
@@ -849,5 +912,39 @@ const styles = StyleSheet.create({
   imageButtonTextSecondary: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  languageLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  resolvedLanguageHint: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  languageHint: {
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  iconRowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconRowImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+  },
+  iconRowPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconRowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

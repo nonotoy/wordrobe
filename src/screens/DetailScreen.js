@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { Divider, FavoriteButton, POSBadge } from '../components/UIComponents';
-import { ChevronLeftIcon } from '../components/Icons';
+import { ChevronLeftIcon, SentenceExampleIcon, PlugConnectionIcon, ConjugationIcon } from '../components/Icons';
 
 export default function DetailScreen({ entry, onClose, onSelectRelated }) {
   const {
@@ -14,6 +14,7 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
     getSentenceDisplay,
     getExamplesForWord,
     getEntryById,
+    t,
   } = useApp();
 
   const examples = getExamplesForWord(entry);
@@ -24,12 +25,12 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
   const hasRelatedWords = entry.related_words && entry.related_words.length > 0;
 
   const localizedKey = (key) => {
-    const keys = {
-      singular: '単数',
-      plural: '複数',
-      possessive: '所属形',
-    };
-    return keys[key] || key;
+    const translationKey = {
+      singular: 'singular',
+      plural: 'plural',
+      possessive: 'possessive',
+    }[key];
+    return translationKey ? t(translationKey) : key;
   };
 
   return (
@@ -37,7 +38,7 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
       <View style={styles.header}>
         <TouchableOpacity onPress={onClose} style={styles.backButton}>
           <ChevronLeftIcon color={theme.accent} size={20} />
-          <Text style={[styles.backText, { color: theme.accent }]}>戻る</Text>
+          <Text style={[styles.backText, { color: theme.accent }]}>{t('back')}</Text>
         </TouchableOpacity>
         <FavoriteButton
           isFavorite={isFavorite(entry.id)}
@@ -74,7 +75,10 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
           {/* Declension */}
           {hasDeclension && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>曲用</Text>
+              <View style={styles.sectionTitleContainer}>
+                <ConjugationIcon color={theme.textSecondary} size={16} />
+                <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginBottom: 0 }]}>{t('declension')}</Text>
+              </View>
               {Object.entries(entry.declension).map(([key, value]) => (
                 <View key={key} style={styles.keyValueRow}>
                   <Text style={[styles.keyText, { color: theme.textTertiary }]}>
@@ -89,7 +93,10 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
           {/* Conjugation */}
           {hasConjugation && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>活用</Text>
+              <View style={styles.sectionTitleContainer}>
+                <ConjugationIcon color={theme.textSecondary} size={16} />
+                <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginBottom: 0 }]}>{t('conjugation')}</Text>
+              </View>
               {Object.entries(entry.conjugation).map(([key, value]) => (
                 <View key={key} style={styles.keyValueRow}>
                   <Text style={[styles.keyText, { color: theme.textTertiary }]}>
@@ -104,7 +111,10 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
           {/* Word Formation */}
           {hasWordFormation && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>語構成</Text>
+              <View style={styles.sectionTitleContainer}>
+                <PlugConnectionIcon color={theme.textSecondary} size={16} />
+                <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginBottom: 0 }]}>{t('wordFormation')}</Text>
+              </View>
               <Text style={[styles.valueText, { color: theme.text }]}>{entry.word_formation}</Text>
             </View>
           )}
@@ -112,9 +122,12 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
           {/* Examples */}
           {hasExamples && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-                例文 ({examples.length})
-              </Text>
+              <View style={styles.sectionTitleContainer}>
+                <SentenceExampleIcon color={theme.textSecondary} size={16} />
+                <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginBottom: 0 }]}>
+                  {t('examplesCount', { count: examples.length })}
+                </Text>
+              </View>
               {examples.map((sentence, index) => (
                 <View key={sentence.id}>
                   <View style={styles.exampleItem}>
@@ -139,7 +152,7 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
           {/* Related Words */}
           {hasRelatedWords && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>参照</Text>
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>{t('seeAlso')}</Text>
               <View style={styles.relatedContainer}>
                 {entry.related_words.map(relId => {
                   const relEntry = getEntryById(relId);
@@ -164,7 +177,7 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
           {entry.source && (
             <View style={[styles.sourceSection, { borderTopColor: theme.border }]}>
               <Text style={[styles.sourceText, { color: theme.textTertiary }]}>
-                出典: {entry.source}
+                {t('sourceLabel')} {entry.source}
               </Text>
             </View>
           )}
@@ -218,6 +231,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
+    marginBottom: 8,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginBottom: 8,
   },
   posBadgeLarge: {

@@ -9,13 +9,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { Toggle } from '../components/UIComponents';
-import { ArrowLeftIcon, ChevronDownIcon, CheckIcon } from '../components/Icons';
+import { ArrowLeftIcon, ChevronDownIcon, CheckIcon, EarthAsiaIcon, NightDayIcon } from '../components/Icons';
 
 const languages = [
   { code: 'ja', name: '日本語' },
   { code: 'en', name: 'English' },
-  { code: 'de', name: 'Deutsch' },
+  { code: 'zh-TW', name: '台灣華語' },
+  { code: 'ko', name: '한국어' },
   { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'es', name: 'Español' },
+  { code: 'it', name: 'Italiano' },
+  { code: 'uk', name: 'Українська' },
+  { code: 'pt', name: 'Português' },
 ];
 
 export default function GlobalSettingsScreen({ navigation }) {
@@ -25,6 +31,7 @@ export default function GlobalSettingsScreen({ navigation }) {
     setDarkMode,
     selectedLanguage,
     setSelectedLanguage,
+    t,
   } = useApp();
 
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
@@ -39,7 +46,7 @@ export default function GlobalSettingsScreen({ navigation }) {
         >
           <ArrowLeftIcon color={theme.text} size={24} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>全体設定</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>{t('globalSettings')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -47,9 +54,12 @@ export default function GlobalSettingsScreen({ navigation }) {
         <View style={styles.content}>
           {/* Language Selector */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-              表示言語
-            </Text>
+            <View style={styles.sectionTitleContainer}>
+              <EarthAsiaIcon color={theme.textSecondary} size={16} />
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                {t('displayLanguage')}
+              </Text>
+            </View>
             <TouchableOpacity
               onPress={() => setShowLanguageSelector(!showLanguageSelector)}
               style={[styles.optionRow, { backgroundColor: theme.bgSecondary, borderRadius: 12 }]}
@@ -93,12 +103,15 @@ export default function GlobalSettingsScreen({ navigation }) {
 
           {/* Dark Mode */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-              表示
-            </Text>
+            <View style={styles.sectionTitleContainer}>
+              <NightDayIcon color={theme.textSecondary} size={16} />
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                {t('display')}
+              </Text>
+            </View>
             <View style={[styles.optionRow, { backgroundColor: theme.bgSecondary, borderRadius: 12 }]}>
               <Text style={[styles.optionText, { color: theme.text }]}>
-                ダークモード
+                {t('darkMode')}
               </Text>
               <Toggle value={darkMode} onValueChange={setDarkMode} />
             </View>
@@ -106,7 +119,7 @@ export default function GlobalSettingsScreen({ navigation }) {
 
           {/* About */}
           <Text style={[styles.aboutText, { color: theme.textTertiary }]}>
-            Wordrobe v0.1.0
+            {t('version')}
           </Text>
         </View>
       </ScrollView>
@@ -146,10 +159,15 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 28,
   },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '500',
-    marginBottom: 12,
   },
   optionRow: {
     flexDirection: 'row',
