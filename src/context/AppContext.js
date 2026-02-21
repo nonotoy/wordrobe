@@ -59,20 +59,82 @@ const getDictMeta = (dict) => {
 
 const EMPTY_DATA = { entries: [], sentences: [], favorites: [], dataSources: [] };
 
+// AsyncStorage has a ~200k character limit per key, so we chunk large data
+const CHUNK_SIZE = 150000; // Safe size under the limit
+
 const saveDictData = async (id, data) => {
   const json = JSON.stringify(data);
   const compressed = LZString.compressToUTF16(json);
-  await AsyncStorage.setItem(`dict_data_${id}`, compressed);
+
+  // Delete old chunks first
+  const oldChunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
+  if (oldChunkCount) {
+    const count = parseInt(oldChunkCount, 10);
+    for (let i = 0; i < count; i++) {
+      await AsyncStorage.removeItem(`dict_data_${id}_${i}`);
+    }
+  }
+
+  // Split into chunks if needed
+  if (compressed.length > CHUNK_SIZE) {
+    const chunks = [];
+    for (let i = 0; i < compressed.length; i += CHUNK_SIZE) {
+      chunks.push(compressed.slice(i, i + CHUNK_SIZE));
+    }
+
+    // Save each chunk
+    for (let i = 0; i < chunks.length; i++) {
+      await AsyncStorage.setItem(`dict_data_${id}_${i}`, chunks[i]);
+    }
+
+    // Save chunk count
+    await AsyncStorage.setItem(`dict_data_${id}_chunks`, chunks.length.toString());
+  } else {
+    // Small enough to save as single key
+    await AsyncStorage.setItem(`dict_data_${id}`, compressed);
+    await AsyncStorage.removeItem(`dict_data_${id}_chunks`);
+  }
 };
 
 const loadDictData = async (id) => {
-  const compressed = await AsyncStorage.getItem(`dict_data_${id}`);
-  if (!compressed) return { ...EMPTY_DATA };
-  const json = LZString.decompressFromUTF16(compressed);
-  return JSON.parse(json);
+  // Check if chunked
+  const chunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
+
+  if (chunkCount) {
+    // Load chunks and reassemble
+    const count = parseInt(chunkCount, 10);
+    const chunks = [];
+    for (let i = 0; i < count; i++) {
+      const chunk = await AsyncStorage.getItem(`dict_data_${id}_${i}`);
+      if (chunk) chunks.push(chunk);
+    }
+
+    if (chunks.length === 0) return { ...EMPTY_DATA };
+
+    const compressed = chunks.join('');
+    const json = LZString.decompressFromUTF16(compressed);
+    return JSON.parse(json);
+  } else {
+    // Single key
+    const compressed = await AsyncStorage.getItem(`dict_data_${id}`);
+    if (!compressed) return { ...EMPTY_DATA };
+    const json = LZString.decompressFromUTF16(compressed);
+    return JSON.parse(json);
+  }
 };
 
 const deleteDictData = async (id) => {
+  // Delete chunks if they exist
+  const chunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
+  if (chunkCount) {
+    const count = parseInt(chunkCount, 10);
+    for (let i = 0; i < count; i++) {
+      await AsyncStorage.removeItem(`dict_data_${id}_${i}`);
+    }
+    await AsyncStorage.removeItem(`dict_data_${id}_chunks`);
+  }
+
+  // Delete single key
   await AsyncStorage.removeItem(`dict_data_${id}`);
 };
 
