@@ -137,33 +137,4 @@ export function isValidISO639_3(code) {
   return !!ISO639_3[code.toLowerCase().trim()];
 }
 
-/**
- * Get all available languages for autocomplete
- * @returns {Array} Array of {code, name, nativeName}
- */
-export function getAllLanguages() {
-  return Object.entries(ISO639_3).map(([code, info]) => ({
-    code,
-    ...info,
-  }));
-}
-
-/**
- * Search languages by name or code
- * @param {string} query - Search query
- * @returns {Array} Matching languages
- */
-export function searchLanguages(query) {
-  if (!query) return [];
-  const q = query.toLowerCase().trim();
-  return Object.entries(ISO639_3)
-    .filter(([code, info]) =>
-      code.includes(q) ||
-      info.name.toLowerCase().includes(q) ||
-      info.nativeName.includes(q)
-    )
-    .map(([code, info]) => ({ code, ...info }))
-    .slice(0, 10);
-}
-
 export default ISO639_3;

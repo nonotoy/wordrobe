@@ -1,33 +1,28 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './src/context/AppContext';
 
-// Screens
 import HomeScreen from './src/screens/HomeScreen';
 import GlobalSettingsScreen from './src/screens/GlobalSettingsScreen';
 import DictionaryScreen from './src/screens/DictionaryScreen';
 import FavoritesScreen from './src/screens/FavoritesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import LoadingScreen from './src/screens/LoadingScreen';
 
-// Icons
 import { HomeIconCustom, SearchAltIcon, StarIconCustom, SettingsIcon2 } from './src/components/Icons';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// ホームに戻るためのダミーコンポーネント（実際には使用されない）
 function GoHomeScreen() {
   return null;
 }
 
-// カスタムタブラベルコンポーネント（改行可能）
-function TabBarLabel({ focused, color, children }) {
+function TabBarLabel({ color, children }) {
   return (
     <Text
       style={{
@@ -46,7 +41,6 @@ function TabBarLabel({ focused, color, children }) {
   );
 }
 
-// 背景色なしのカスタムタブボタン
 function CustomTabBarButton(props) {
   return (
     <TouchableOpacity
@@ -66,7 +60,6 @@ function DictionaryTabNavigator({ navigation }) {
       initialRouteName="Dictionary"
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: true,
         tabBarStyle: {
           backgroundColor: darkMode ? 'rgba(10,10,11,0.95)' : 'rgba(255,255,255,0.95)',
           borderTopColor: theme.border,
@@ -91,8 +84,8 @@ function DictionaryTabNavigator({ navigation }) {
         name="GoHome"
         component={GoHomeScreen}
         options={{
-          tabBarLabel: ({ focused, color }) => (
-            <TabBarLabel focused={focused} color={color}>{t('home')}</TabBarLabel>
+          tabBarLabel: ({ color }) => (
+            <TabBarLabel color={color}>{t('home')}</TabBarLabel>
           ),
           tabBarIcon: ({ color }) => <HomeIconCustom color={color} size={22} />,
         }}
@@ -107,8 +100,8 @@ function DictionaryTabNavigator({ navigation }) {
         name="Dictionary"
         component={DictionaryScreen}
         options={{
-          tabBarLabel: ({ focused, color }) => (
-            <TabBarLabel focused={focused} color={color}>{t('search')}</TabBarLabel>
+          tabBarLabel: ({ color }) => (
+            <TabBarLabel color={color}>{t('search')}</TabBarLabel>
           ),
           tabBarIcon: ({ color }) => <SearchAltIcon color={color} size={22} />,
         }}
@@ -117,8 +110,8 @@ function DictionaryTabNavigator({ navigation }) {
         name="Favorites"
         component={FavoritesScreen}
         options={{
-          tabBarLabel: ({ focused, color }) => (
-            <TabBarLabel focused={focused} color={color}>{t('favorites')}</TabBarLabel>
+          tabBarLabel: ({ color }) => (
+            <TabBarLabel color={color}>{t('favorites')}</TabBarLabel>
           ),
           tabBarIcon: ({ color }) => <StarIconCustom color={color} size={22} />,
         }}
@@ -127,8 +120,8 @@ function DictionaryTabNavigator({ navigation }) {
         name="DictionarySettings"
         component={SettingsScreen}
         options={{
-          tabBarLabel: ({ focused, color }) => (
-            <TabBarLabel focused={focused} color={color}>{t('dictionarySettings')}</TabBarLabel>
+          tabBarLabel: ({ color }) => (
+            <TabBarLabel color={color}>{t('dictionarySettings')}</TabBarLabel>
           ),
           tabBarIcon: ({ color }) => <SettingsIcon2 color={color} size={22} />,
           tabBarButton: CustomTabBarButton,
@@ -139,7 +132,7 @@ function DictionaryTabNavigator({ navigation }) {
 }
 
 function AppNavigator() {
-  const { theme, currentDictionary } = useApp();
+  const { theme, currentDictionary, t } = useApp();
 
   return (
     <Stack.Navigator
@@ -149,22 +142,14 @@ function AppNavigator() {
       }}
     >
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen
-        name="GlobalSettings"
-        component={GlobalSettingsScreen}
-        options={{
-          presentation: 'card',
-        }}
-      />
+      <Stack.Screen name="GlobalSettings" component={GlobalSettingsScreen} />
       <Stack.Screen
         name="DictionaryTabs"
         component={DictionaryTabNavigator}
         options={{
           headerShown: true,
-          headerTitle: currentDictionary?.name || '辞書',
-          headerStyle: {
-            backgroundColor: theme.bg,
-          },
+          headerTitle: currentDictionary?.name || t('dictionary'),
+          headerStyle: { backgroundColor: theme.bg },
           headerTintColor: theme.text,
           headerShadowVisible: false,
           headerBackVisible: false,
@@ -186,16 +171,7 @@ export default function App() {
 }
 
 function AppContent() {
-  const { darkMode, isLoading } = useApp();
-
-  if (isLoading) {
-    return (
-      <>
-        <StatusBar style={darkMode ? 'light' : 'dark'} />
-        <LoadingScreen />
-      </>
-    );
-  }
+  const { darkMode } = useApp();
 
   return (
     <NavigationContainer>

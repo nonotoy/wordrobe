@@ -1,11 +1,24 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { Divider, FavoriteButton, POSBadge } from '../components/UIComponents';
-import { ChevronLeftIcon, SentenceExampleIcon, PlugConnectionIcon, ConjugationIcon } from '../components/Icons';
+import { ChevronLeftIcon, SentenceExampleIcon, PlugConnectionIcon, ConjugationIcon, NoteStickyIcon } from '../components/Icons';
 
 export default function DetailScreen({ entry, onClose, onSelectRelated }) {
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastOpacity] = useState(new Animated.Value(0));
+
+  const showCopyToast = () => {
+    setToastVisible(true);
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+      Animated.delay(1000),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => setToastVisible(false));
+  };
+
   const {
     theme,
     isFavorite,
@@ -22,6 +35,7 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
   const hasConjugation = entry.conjugation && Object.keys(entry.conjugation).length > 0;
   const hasWordFormation = entry.word_formation;
   const hasExamples = examples.length > 0;
+  const hasNotes = !!entry.notes;
   const hasRelatedWords = entry.related_words && entry.related_words.length > 0;
 
   const localizedKey = (key) => {
@@ -51,7 +65,13 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.titleSection}>
-            <Text style={[styles.title, { color: theme.text }]}>
+            <Text
+              style={[styles.title, { color: theme.text }]}
+              onLongPress={async () => {
+                await Clipboard.setStringAsync(entry.src_primary);
+                showCopyToast();
+              }}
+            >
               {getWordDisplay(entry)}
             </Text>
             {entry.pronunciation && (
@@ -149,6 +169,17 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
             </View>
           )}
 
+          {/* Notes */}
+          {hasNotes && (
+            <View style={styles.section}>
+              <View style={styles.sectionTitleContainer}>
+                <NoteStickyIcon color={theme.textSecondary} size={16} />
+                <Text style={[styles.sectionTitle, { color: theme.textSecondary, marginBottom: 0 }]}>{t('notes')}</Text>
+              </View>
+              <Text style={[styles.valueText, { color: theme.text }]}>{entry.notes}</Text>
+            </View>
+          )}
+
           {/* Related Words */}
           {hasRelatedWords && (
             <View style={styles.section}>
@@ -183,6 +214,12 @@ export default function DetailScreen({ entry, onClose, onSelectRelated }) {
           )}
         </View>
       </ScrollView>
+
+      {toastVisible && (
+        <Animated.View style={[styles.toast, { opacity: toastOpacity }]}>
+          <Text style={styles.toastText}>Copied "{entry.src_primary}"</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -301,5 +338,18 @@ const styles = StyleSheet.create({
   sourceText: {
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 14,
   },
 });

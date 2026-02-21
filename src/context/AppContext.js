@@ -1,31 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Dimensions } from 'react-native';
+import { I18nManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LZString from 'lz-string';
 import { parseCSV, parseEntriesFromCSV, parseSentencesFromCSV } from '../utils/csvParser';
 import { getTranslation } from '../i18n/translations';
 
 const AppContext = createContext();
 
-// Calculate items per page based on screen height
-const calculateItemsPerPage = () => {
-  const { height } = Dimensions.get('window');
-  // Estimated fixed heights:
-  // - Navigation header: ~44px
-  // - Header divider: ~1px
-  // - Search bar with padding: ~80px
-  // - Section header: ~48px
-  // - Pagination: ~60px
-  // - Tab bar: ~84px (64px + average safe area bottom ~20px)
-  // - List content padding: ~16px
-  // Total: ~333px
-  const fixedHeight = 333;
-  const itemHeight = 70; // Card (paddingVertical 24 + content ~40) + divider (~8)
-  const availableHeight = height - fixedHeight;
-  const itemsPerPage = Math.floor(availableHeight / itemHeight);
-  return Math.max(5, Math.min(itemsPerPage, 20)); // Between 5 and 20 items
-};
+const ITEMS_PER_PAGE = 10;
 
-const ITEMS_PER_PAGE = calculateItemsPerPage();
+const RTL_LANGUAGES = ['ar', 'fa'];
+
+const META_FIELDS = ['id', 'name', 'language1', 'language2', 'language1Code', 'language2Code', 'iconImage'];
 
 const lightTheme = {
   bg: '#ffffff',
@@ -65,97 +51,167 @@ const darkTheme = {
   warningText: '#fef08a',
 };
 
-// デフォルトの辞書テンプレート
-const createEmptyDictionary = (id, options) => {
-  const name = typeof options === 'string' ? options : options.name;
-  const language1 = typeof options === 'object' ? options.language1 : null;
-  const language2 = typeof options === 'object' ? options.language2 : null;
-  const language1Code = typeof options === 'object' ? options.language1Code : null;
-  const language2Code = typeof options === 'object' ? options.language2Code : null;
+const getDictMeta = (dict) => {
+  const meta = {};
+  META_FIELDS.forEach(f => { if (dict[f] !== undefined) meta[f] = dict[f]; });
+  return meta;
+};
 
+const EMPTY_DATA = { entries: [], sentences: [], favorites: [], dataSources: [] };
+
+const saveDictData = async (id, data) => {
+  const json = JSON.stringify(data);
+  const compressed = LZString.compressToUTF16(json);
+  await AsyncStorage.setItem(`dict_data_${id}`, compressed);
+};
+
+const loadDictData = async (id) => {
+  const compressed = await AsyncStorage.getItem(`dict_data_${id}`);
+  if (!compressed) return { ...EMPTY_DATA };
+  const json = LZString.decompressFromUTF16(compressed);
+  return JSON.parse(json);
+};
+
+const deleteDictData = async (id) => {
+  await AsyncStorage.removeItem(`dict_data_${id}`);
+};
+
+const createEmptyMeta = (id, options) => {
+  const isObj = typeof options === 'object';
   return {
     id,
-    name,
-    language1,
-    language2,
-    language1Code,
-    language2Code,
+    name: isObj ? options.name : options,
+    language1: isObj ? options.language1 : null,
+    language2: isObj ? options.language2 : null,
+    language1Code: isObj ? options.language1Code : null,
+    language2Code: isObj ? options.language2Code : null,
     iconImage: null,
-    entries: [],
-    sentences: [],
-    favorites: [],
-    dataSources: [],
   };
 };
 
 export function AppProvider({ children }) {
-  // グローバル設定
   const [darkMode, setDarkMode] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('ja');
-  const [isLoading, setIsLoading] = useState(false);
-
-  // 辞書データ
-  const [dictionaries, setDictionaries] = useState([]);
+  const [dictionaries, setDictionaries] = useState([]); // metadata only
   const [currentDictionaryId, setCurrentDictionaryId] = useState(null);
-
-  // UI状態
+  const [currentDictData, setCurrentDictData] = useState({ ...EMPTY_DATA });
   const [searchQuery, setSearchQuery] = useState('');
-  const [homePage, setHomePage] = useState(1);
-  const [examplesPage, setExamplesPage] = useState(1);
-  const [favoritesPage, setFavoritesPage] = useState(1);
+  const [searchMode, setSearchMode] = useState('partial');
 
   const theme = darkMode ? darkTheme : lightTheme;
 
-  // Translation function
   const t = useCallback((key, variables = {}) => {
     return getTranslation(selectedLanguage, key, variables);
   }, [selectedLanguage]);
 
-  // 現在の辞書を取得
-  const currentDictionary = dictionaries.find(d => d.id === currentDictionaryId) || null;
+  const currentMeta = dictionaries.find(d => d.id === currentDictionaryId) || null;
 
-  // Load persisted data on mount
+  // Backward-compatible: merge meta + data for components that access currentDictionary
+  const currentDictionary = currentMeta
+    ? { ...currentMeta, ...currentDictData }
+    : null;
+
   useEffect(() => {
     loadPersistedData();
   }, []);
+
+  // Migration: convert old single-key format to split format
+  const migrateOldFormat = async (oldDictionaries, storedCurrentId) => {
+    const metas = oldDictionaries.map(d => getDictMeta(d));
+
+    // Save each dictionary's data separately (compressed)
+    for (const dict of oldDictionaries) {
+      const data = {
+        entries: dict.entries || [],
+        sentences: dict.sentences || [],
+        favorites: dict.favorites || [],
+        dataSources: dict.dataSources || [],
+      };
+      await saveDictData(dict.id, data);
+    }
+
+    // Save metadata
+    await AsyncStorage.setItem('dictionaries_meta', JSON.stringify(metas));
+
+    // Remove old key
+    await AsyncStorage.removeItem('dictionaries');
+
+    setDictionaries(metas);
+
+    // Load current dictionary's data
+    if (storedCurrentId) {
+      const data = await loadDictData(storedCurrentId);
+      setCurrentDictData(data);
+    }
+  };
 
   const loadPersistedData = async () => {
     try {
       const [
         storedDarkMode,
         storedLanguage,
-        storedDictionaries,
         storedCurrentDictionaryId,
+        storedOldDictionaries,
+        storedNewMeta,
       ] = await Promise.all([
         AsyncStorage.getItem('darkMode'),
         AsyncStorage.getItem('selectedLanguage'),
-        AsyncStorage.getItem('dictionaries'),
         AsyncStorage.getItem('currentDictionaryId'),
+        AsyncStorage.getItem('dictionaries'),       // old format
+        AsyncStorage.getItem('dictionaries_meta'),   // new format
       ]);
 
       if (storedDarkMode) setDarkMode(JSON.parse(storedDarkMode));
-      if (storedLanguage) setSelectedLanguage(storedLanguage);
-      if (storedDictionaries) setDictionaries(JSON.parse(storedDictionaries));
+      if (storedLanguage) {
+        setSelectedLanguage(storedLanguage);
+        const shouldBeRTL = RTL_LANGUAGES.includes(storedLanguage);
+        if (I18nManager.isRTL !== shouldBeRTL) {
+          I18nManager.allowRTL(shouldBeRTL);
+          I18nManager.forceRTL(shouldBeRTL);
+        }
+      }
       if (storedCurrentDictionaryId) setCurrentDictionaryId(storedCurrentDictionaryId);
+
+      // Check for old format and migrate
+      if (storedOldDictionaries) {
+        const oldDictionaries = JSON.parse(storedOldDictionaries);
+        await migrateOldFormat(oldDictionaries, storedCurrentDictionaryId);
+        return;
+      }
+
+      // New format
+      if (storedNewMeta) {
+        setDictionaries(JSON.parse(storedNewMeta));
+
+        // Load current dictionary's data
+        if (storedCurrentDictionaryId) {
+          const data = await loadDictData(storedCurrentDictionaryId);
+          setCurrentDictData(data);
+        }
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     }
   };
 
-  // Save functions
+  const saveMeta = async (newMetas) => {
+    await AsyncStorage.setItem('dictionaries_meta', JSON.stringify(newMetas));
+    setDictionaries(newMetas);
+  };
+
   const saveDarkMode = async (value) => {
     setDarkMode(value);
     await AsyncStorage.setItem('darkMode', JSON.stringify(value));
   };
 
   const saveLanguage = async (value) => {
+    const shouldBeRTL = RTL_LANGUAGES.includes(value);
+    if (I18nManager.isRTL !== shouldBeRTL) {
+      I18nManager.allowRTL(shouldBeRTL);
+      I18nManager.forceRTL(shouldBeRTL);
+    }
     setSelectedLanguage(value);
     await AsyncStorage.setItem('selectedLanguage', value);
-  };
-
-  const saveDictionaries = async (newDictionaries) => {
-    setDictionaries(newDictionaries);
-    await AsyncStorage.setItem('dictionaries', JSON.stringify(newDictionaries));
   };
 
   const saveCurrentDictionaryId = async (id) => {
@@ -167,91 +223,130 @@ export function AppProvider({ children }) {
     }
   };
 
-  // 辞書操作
   const addDictionary = async (options) => {
-    // options can be a string (name) or an object with name, language1, language2, etc.
-    const newDictionary = createEmptyDictionary(Date.now().toString(), options);
-    const newDictionaries = [...dictionaries, newDictionary];
-    await saveDictionaries(newDictionaries);
-    return newDictionary;
+    const id = Date.now().toString();
+    const meta = createEmptyMeta(id, options);
+    await saveMeta([...dictionaries, meta]);
+    await saveDictData(id, { ...EMPTY_DATA });
+    return { ...meta, ...EMPTY_DATA };
   };
 
   const deleteDictionary = async (id) => {
-    const newDictionaries = dictionaries.filter(d => d.id !== id);
-    await saveDictionaries(newDictionaries);
+    await saveMeta(dictionaries.filter(d => d.id !== id));
+    await deleteDictData(id);
     if (currentDictionaryId === id) {
       await saveCurrentDictionaryId(null);
+      setCurrentDictData({ ...EMPTY_DATA });
     }
   };
 
   const updateDictionary = async (id, updates) => {
-    const newDictionaries = dictionaries.map(d =>
-      d.id === id ? { ...d, ...updates } : d
-    );
-    await saveDictionaries(newDictionaries);
+    // Separate meta updates from data updates
+    const metaUpdates = {};
+    const dataUpdates = {};
+    let hasMetaUpdate = false;
+    let hasDataUpdate = false;
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (META_FIELDS.includes(key)) {
+        metaUpdates[key] = value;
+        hasMetaUpdate = true;
+      } else {
+        dataUpdates[key] = value;
+        hasDataUpdate = true;
+      }
+    }
+
+    // Update metadata if needed
+    if (hasMetaUpdate) {
+      const newMetas = dictionaries.map(d =>
+        d.id === id ? { ...d, ...metaUpdates } : d
+      );
+      await saveMeta(newMetas);
+    }
+
+    // Update data if needed
+    if (hasDataUpdate) {
+      const isCurrentDict = id === currentDictionaryId;
+      const existingData = isCurrentDict ? currentDictData : await loadDictData(id);
+      const newData = { ...existingData, ...dataUpdates };
+      await saveDictData(id, newData);
+
+      // Update state if it's the current dictionary
+      if (isCurrentDict) {
+        setCurrentDictData(newData);
+      }
+    }
   };
 
   const selectDictionary = async (id) => {
     await saveCurrentDictionaryId(id);
     setSearchQuery('');
-    setHomePage(1);
-    setExamplesPage(1);
-    setFavoritesPage(1);
+
+    // Load selected dictionary's data
+    if (id) {
+      const data = await loadDictData(id);
+      setCurrentDictData(data);
+    } else {
+      setCurrentDictData({ ...EMPTY_DATA });
+    }
   };
 
-  // 現在の辞書のデータ操作
   const updateCurrentDictionary = async (updates) => {
     if (!currentDictionaryId) return;
     await updateDictionary(currentDictionaryId, updates);
   };
 
   const toggleFavorite = async (entryId) => {
-    if (!currentDictionary) return;
-    const favorites = currentDictionary.favorites || [];
-    const newFavorites = favorites.includes(entryId)
-      ? favorites.filter(id => id !== entryId)
-      : [...favorites, entryId];
+    if (!currentDictionaryId) return;
+    const favs = currentDictData.favorites || [];
+    const newFavorites = favs.includes(entryId)
+      ? favs.filter(id => id !== entryId)
+      : [...favs, entryId];
     await updateCurrentDictionary({ favorites: newFavorites });
   };
 
   const isFavorite = (entryId) => {
-    if (!currentDictionary) return false;
-    return (currentDictionary.favorites || []).includes(entryId);
+    return (currentDictData.favorites || []).includes(entryId);
   };
 
-  // Computed values for current dictionary
-  const entries = currentDictionary?.entries || [];
-  const sentences = currentDictionary?.sentences || [];
-  const favorites = currentDictionary?.favorites || [];
-  const dataSources = currentDictionary?.dataSources || [];
+  const entries = currentDictData.entries || [];
+  const sentences = currentDictData.sentences || [];
+  const favorites = currentDictData.favorites || [];
+  const dataSources = currentDictData.dataSources || [];
 
   const filteredEntries = searchQuery
-    ? entries.filter(entry => {
-        const query = searchQuery.toLowerCase();
-        return (
-          entry.src_primary.toLowerCase().includes(query) ||
-          (entry.src_secondary && entry.src_secondary.toLowerCase().includes(query)) ||
-          entry.meaning.toLowerCase().includes(query)
+    ? (() => {
+        const query = searchQuery.trim().toLowerCase();
+        const match = (text) => {
+          if (!text) return false;
+          const lower = text.toLowerCase();
+          switch (searchMode) {
+            case 'exact': return lower === query;
+            case 'prefix': return lower.startsWith(query);
+            case 'suffix': return lower.endsWith(query);
+            default: return lower.includes(query);
+          }
+        };
+        const results = entries.filter(entry =>
+          match(entry.src_primary) ||
+          match(entry.src_secondary) ||
+          match(entry.meaning)
         );
-      })
+        return results.sort((a, b) => {
+          const aExact = a.src_primary.toLowerCase() === query ? 0 : 1;
+          const bExact = b.src_primary.toLowerCase() === query ? 0 : 1;
+          return aExact - bExact;
+        });
+      })()
     : entries;
 
   const favoriteEntries = entries.filter(entry => favorites.includes(entry.id));
 
-  // Pagination helpers
-  const paginate = (items, page) => {
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    return items.slice(start, start + ITEMS_PER_PAGE);
-  };
-
-  const getTotalPages = (items) => Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE));
-
-  // Display helpers
   const getWordDisplay = (entry) => entry.src_primary;
   const getSentenceDisplay = (sentence) => sentence.sentence_primary;
 
   const getExamplesForWord = (entry) => {
-    // 検索ワードを収集: src_primary + conjugation/declension/allomorphの全値
     const searchWords = new Set();
     searchWords.add(entry.src_primary.toLowerCase());
 
@@ -270,16 +365,57 @@ export function AppProvider({ children }) {
     extractValues(entry.declension);
     extractValues(entry.allomorph);
 
-    // 全辞書の例文を横断検索
-    const allSentences = dictionaries.flatMap(d => d.sentences || []);
+    // Tokenize sentence: split by space, then handle = separator
+    const tokenizeSentence = (sentence) => {
+      const words = sentence.split(/\s+/);
+      const tokens = [];
 
-    // id重複排除しながらマッチする例文を返す
+      for (const word of words) {
+        if (!word) continue;
+
+        if (word.includes('=')) {
+          // Split by = and add = to each part appropriately
+          // word1=word2 → [word1=, =word2]
+          // word1=word2=word3 → [word1=, =word2=, =word3]
+          const parts = word.split('=');
+          for (let i = 0; i < parts.length; i++) {
+            if (!parts[i]) continue;
+            let token = parts[i];
+            if (i < parts.length - 1) token += '=';  // Not the last part
+            if (i > 0) token = '=' + token;  // Not the first part
+            tokens.push(token);
+          }
+        } else {
+          tokens.push(word);
+        }
+      }
+
+      return tokens;
+    };
+
+    // Check if token matches search word
+    const matchesSearchWord = (token, searchWord) => {
+      // If search word contains =, exact match required
+      if (searchWord.includes('=')) {
+        return token === searchWord;
+      }
+      // Otherwise, strip = from token and compare
+      const stripped = token.replace(/=/g, '');
+      return stripped === searchWord;
+    };
+
     const seen = new Set();
-    return allSentences
+    return sentences
       .filter(s => {
         const sentence = s.sentence_primary?.toLowerCase();
         if (!sentence) return false;
-        if (![...searchWords].some(word => sentence.includes(word))) return false;
+
+        const tokens = tokenizeSentence(sentence);
+        const hasMatch = [...searchWords].some(searchWord =>
+          tokens.some(token => matchesSearchWord(token, searchWord))
+        );
+
+        if (!hasMatch) return false;
         if (seen.has(s.id)) return false;
         seen.add(s.id);
         return true;
@@ -289,9 +425,8 @@ export function AppProvider({ children }) {
 
   const getEntryById = (id) => entries.find(e => e.id === id);
 
-  // Data loading for current dictionary
   const loadData = async (content, fileExtension) => {
-    if (!currentDictionaryId) throw new Error('辞書が選択されていません');
+    if (!currentDictionaryId) throw new Error('No dictionary selected');
 
     try {
       let importedType = null;
@@ -312,7 +447,6 @@ export function AppProvider({ children }) {
           importedType = 'sentences';
         }
       } else {
-        // JSON
         const data = JSON.parse(content);
 
         if (data.entries) {
@@ -325,7 +459,6 @@ export function AppProvider({ children }) {
           importedType = importedType ? null : 'sentences';
         }
 
-        // Handle arrays directly
         if (Array.isArray(data)) {
           if (data[0]?.src_primary) {
             newEntries = data;
@@ -337,13 +470,36 @@ export function AppProvider({ children }) {
         }
       }
 
-      // Update current dictionary
       const updates = {};
       if (newEntries) updates.entries = newEntries;
       if (newSentences) updates.sentences = newSentences;
 
+      const expectedEntriesCount = newEntries?.length || 0;
+      const expectedSentencesCount = newSentences?.length || 0;
+
       if (Object.keys(updates).length > 0) {
         await updateCurrentDictionary(updates);
+
+        // Validate import: verify saved data matches what we tried to save
+        const savedData = await loadDictData(currentDictionaryId);
+
+        if (expectedEntriesCount > 0) {
+          const actualEntriesCount = savedData.entries?.length || 0;
+          if (actualEntriesCount !== expectedEntriesCount) {
+            throw new Error(
+              `Import incomplete: Expected ${expectedEntriesCount} entries but only ${actualEntriesCount} were saved. Please try importing again.`
+            );
+          }
+        }
+
+        if (expectedSentencesCount > 0) {
+          const actualSentencesCount = savedData.sentences?.length || 0;
+          if (actualSentencesCount !== expectedSentencesCount) {
+            throw new Error(
+              `Import incomplete: Expected ${expectedSentencesCount} sentences but only ${actualSentencesCount} were saved. Please try importing again.`
+            );
+          }
+        }
       }
 
       return importedType;
@@ -357,17 +513,17 @@ export function AppProvider({ children }) {
     await updateCurrentDictionary({ dataSources: sources });
   };
 
+  const isRTL = RTL_LANGUAGES.includes(selectedLanguage);
+
   const value = {
-    // Global settings
     darkMode,
     selectedLanguage,
-    isLoading,
+    isRTL,
     theme,
     t,
     setDarkMode: saveDarkMode,
     setSelectedLanguage: saveLanguage,
 
-    // Dictionaries
     dictionaries,
     currentDictionary,
     currentDictionaryId,
@@ -376,47 +532,27 @@ export function AppProvider({ children }) {
     updateDictionary,
     selectDictionary,
 
-    // Current dictionary data
     entries,
     sentences,
     favorites,
     dataSources,
     searchQuery,
+    searchMode,
+    setSearchMode,
     filteredEntries,
     favoriteEntries,
-
-    // Pagination
-    homePage,
-    examplesPage,
-    favoritesPage,
-    setHomePage,
-    setExamplesPage,
-    setFavoritesPage,
     ITEMS_PER_PAGE,
-    paginatedHomeEntries: paginate(filteredEntries, homePage),
-    paginatedSentences: paginate(sentences, examplesPage),
-    paginatedFavorites: paginate(favoriteEntries, favoritesPage),
-    homeTotalPages: getTotalPages(filteredEntries),
-    examplesTotalPages: getTotalPages(sentences),
-    favoritesTotalPages: getTotalPages(favoriteEntries),
 
-    // Actions
-    setSearchQuery: (query) => {
-      setSearchQuery(query);
-      setHomePage(1);
-    },
+    setSearchQuery,
     toggleFavorite,
     isFavorite,
     setDataSources,
     loadData,
 
-    // Helpers
     getWordDisplay,
     getSentenceDisplay,
     getExamplesForWord,
     getEntryById,
-    paginate,
-    getTotalPages,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

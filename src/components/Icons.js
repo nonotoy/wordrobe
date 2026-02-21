@@ -9,31 +9,6 @@ export function SimpleBookIcon({ color = '#000', size = 24 }) {
   );
 }
 
-export function ListIcon({ color = '#000', size = 24 }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M4 6h16M4 12h16M4 18h10" />
-    </Svg>
-  );
-}
-
-export function StarIcon({ color = '#000', size = 24, filled = false }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : 'none'} stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-    </Svg>
-  );
-}
-
-export function GearIcon({ color = '#000', size = 24 }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <Circle cx="12" cy="12" r="3" />
-      <Path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
-    </Svg>
-  );
-}
-
 export function SearchIcon({ color = '#000', size = 24 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -83,35 +58,10 @@ export function XIcon({ color = '#000', size = 24 }) {
   );
 }
 
-export function TrashIcon({ color = '#000', size = 24 }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-    </Svg>
-  );
-}
-
-export function DownloadIcon({ color = '#000', size = 24 }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-    </Svg>
-  );
-}
-
 export function PlusIcon({ color = '#000', size = 24 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Path d="M12 5v14M5 12h14" />
-    </Svg>
-  );
-}
-
-export function EditIcon({ color = '#000', size = 24 }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-      <Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
     </Svg>
   );
 }
@@ -124,15 +74,6 @@ export function ArrowLeftIcon({ color = '#000', size = 24 }) {
   );
 }
 
-export function HomeIcon({ color = '#000', size = 24 }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-      <Path d="M9 22V12h6v10" />
-    </Svg>
-  );
-}
-
 export function FolderIcon({ color = '#000', size = 24 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -141,7 +82,6 @@ export function FolderIcon({ color = '#000', size = 24 }) {
   );
 }
 
-// Custom icons from assets
 export function HomeIconCustom({ color = '#000', size = 24 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
@@ -154,14 +94,6 @@ export function SearchAltIcon({ color = '#000', size = 24 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
       <Path d="m16 6a1 1 0 0 1 0 2h-8a1 1 0 0 1 0-2zm7.707 17.707a1 1 0 0 1 -1.414 0l-2.407-2.407a4.457 4.457 0 0 1 -2.386.7 4.5 4.5 0 1 1 4.5-4.5 4.457 4.457 0 0 1 -.7 2.386l2.407 2.407a1 1 0 0 1 0 1.414zm-6.207-3.707a2.5 2.5 0 1 0 -2.5-2.5 2.5 2.5 0 0 0 2.5 2.5zm-4.5 2h-6a3 3 0 0 1 -3-3v-14a3 3 0 0 1 3-3h12a1 1 0 0 1 1 1v8a1 1 0 0 0 2 0v-8a3 3 0 0 0 -3-3h-12a5.006 5.006 0 0 0 -5 5v14a5.006 5.006 0 0 0 5 5h6a1 1 0 0 0 0-2z" />
-    </Svg>
-  );
-}
-
-export function SentenceIcon({ color = '#000', size = 24 }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-      <Path d="m11,9.5v3.5c0,2.206-1.794,4-4,4-.553,0-1-.447-1-1s.447-1,1-1c1.103,0,2-.897,2-2h-1.5c-.828,0-1.5-.672-1.5-1.5v-1.5c0-1.105.895-2,2-2h1.5c.828,0,1.5.672,1.5,1.5Zm5.5-1.5h-1.5c-1.105,0-2,.895-2,2v1.5c0,.828.672,1.5,1.5,1.5h1.5c0,1.103-.897,2-2,2-.553,0-1,.447-1,1s.447,1,1,1c2.206,0,4-1.794,4-4v-3.5c0-.828-.672-1.5-1.5-1.5Zm7.5-3v14c0,2.757-2.243,5-5,5H5c-2.757,0-5-2.243-5-5V5C0,2.243,2.243,0,5,0h14c2.757,0,5,2.243,5,5Zm-2,0c0-1.654-1.346-3-3-3H5c-1.654,0-3,1.346-3,3v14c0,1.654,1.346,3,3,3h14c1.654,0,3-1.346,3-3V5Z" />
     </Svg>
   );
 }
@@ -220,14 +152,6 @@ export function NightDayIcon({ color = '#000', size = 24 }) {
   );
 }
 
-export function MainIcon({ color = '#000', size = 24 }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-      <Path d="M5.775,10.994c.358,0,.669-.245,.753-.593l.097-.401h2.148l.08,.358c.082,.371,.412,.636,.792,.636,.521,0,.907-.483,.791-.991l-1.04-4.581c-.311-1.853-2.97-1.844-3.303-.04l-1.072,4.664c-.112,.485,.257,.948,.755,.948Zm1.881-5.272c.019-.068,.05-.122,.097-.122,.014,.01,.057,.063,.082,.176l.583,2.624h-1.407l.646-2.678Zm3.844,1.478c0-.442,.358-.8,.8-.8h.4c.442,0,.8,.358,.8,.8s-.358,.8-.8,.8h-.4c-.442,0-.8-.358-.8-.8Zm3.184,1.749l2.329-3.349h-1.763c-.442,0-.8-.358-.8-.8s.358-.8,.8-.8h2.444c.721,0,1.306,.585,1.306,1.306,0,.266-.082,.527-.234,.745l-2.329,3.35h1.763c.442,0,.8,.358,.8,.8s-.358,.8-.8,.8h-2.444c-.721,0-1.306-.585-1.306-1.306,0-.266,.082-.526,.234-.745Zm9.316,14.051c0,.553-.448,1-1,1H1c-.552,0-1-.447-1-1s.448-1,1-1H10.316c-.307-.891-1.126-2-3.316-2H1c-.552,0-1-.447-1-1s.448-1,1-1H7c2.85,0,4.321,1.404,5,2.858,.679-1.454,2.15-2.858,5-2.858h6c.552,0,1,.447,1,1s-.448,1-1,1h-6c-2.191,0-3.009,1.11-3.316,2h9.316c.552,0,1,.447,1,1ZM6,15h3.12l1.844,1.638c.629,.498,1.48,.474,2.113-.035l1.803-1.603h3.12c2.757,0,5-2.243,5-5V5c0-2.757-2.243-5-5-5H6C3.243,0,1,2.243,1,5v5c0,2.757,2.243,5,5,5ZM3,5c0-1.654,1.346-3,3-3h12c1.654,0,3,1.346,3,3v5c0,1.654-1.346,3-3,3h-3.5c-.245,0-.481,.09-.665,.253l-1.834,1.632-1.836-1.632c-.183-.163-.419-.253-.665-.253h-3.5c-1.654,0-3-1.346-3-3V5Z" />
-    </Svg>
-  );
-}
-
 export function FaviconIcon2({ size = 24 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 500 600">
@@ -267,6 +191,22 @@ export function ConjugationIcon({ color = '#000', size = 24 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path fill={color} d="M23,3H13a1,1,0,0,0-1,1V7.27L9.6,3.11a2,2,0,0,0-3.47,0h0L.13,13.5a1,1,0,0,0,0,1A1,1,0,0,0,1,15H5.29A6.91,6.91,0,0,0,5,17a7,7,0,0,0,14,0,6.91,6.91,0,0,0-.29-2H23a1,1,0,0,0,1-1V4A1,1,0,0,0,23,3ZM2.73,13,7.86,4.11,11.29,10a7,7,0,0,0-5,3ZM12,22a5,5,0,1,1,5-5A5,5,0,0,1,12,22Zm10-9H17.74A7.07,7.07,0,0,0,14,10.29V5h8Z" />
+    </Svg>
+  );
+}
+
+export function NoteStickyIcon({ color = '#000', size = 24 }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path fill={color} d="M21,0H3C1.35,0,0,1.35,0,3V24H17.41l6.59-6.59V3c0-1.65-1.35-3-3-3ZM2,3c0-.55,.45-1,1-1H21c.55,0,1,.45,1,1v13h-6v6H2V3Zm18.59,15l-2.59,2.59v-2.59h2.59Z" />
+    </Svg>
+  );
+}
+
+export function TextInputLeftIcon({ color = '#000', size = 24 }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path fill={color} d="M24,8v8c0,2.757-2.243,5-5,5h-7c-.552,0-1-.447-1-1s.448-1,1-1h7c1.654,0,3-1.346,3-3V8c0-1.654-1.346-3-3-3h-7c-.552,0-1-.448-1-1s.448-1,1-1h7c2.757,0,5,2.243,5,5Zm-8,9c.553,0,1-.447,1-1v-7h2c.553,0,1-.448,1-1s-.447-1-1-1h-6c-.552,0-1,.448-1,1s.448,1,1,1h2v7c0,.553,.447,1,1,1Zm-6,5c-.551,0-1-.448-1-1V3c0-.551,.449-1,1-1s1-.448,1-1-.448-1-1-1c-.771,0-1.468,.301-2,.78-.532-.48-1.229-.78-2-.78-.552,0-1,.448-1,1s.448,1,1,1,1,.449,1,1V21c0,.552-.449,1-1,1s-1,.447-1,1,.448,1,1,1c.771,0,1.468-.301,2-.78,.532,.48,1.229,.78,2,.78,.552,0,1-.447,1-1s-.448-1-1-1ZM4.249,5.094c.535-.137,.857-.683,.719-1.217-.137-.535-.681-.858-1.217-.719C1.542,3.726,0,5.717,0,8v8c0,2.282,1.542,4.273,3.75,4.843,.084,.021,.167,.031,.25,.031,.445,0,.852-.3,.968-.751,.138-.534-.184-1.08-.719-1.218-1.325-.341-2.25-1.535-2.25-2.905V8c0-1.37,.925-2.565,2.249-2.906Z" />
     </Svg>
   );
 }

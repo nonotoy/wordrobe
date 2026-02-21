@@ -1,44 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
-import { SearchBar, Divider, POSBadge, DialectBadge, Pagination } from '../components/UIComponents';
+import { SearchBar, Divider, POSBadge, DialectBadge } from '../components/UIComponents';
 import DetailScreen from './DetailScreen';
 
-// Card height = paddingVertical 12*2 + wordText ~20 + wordRow marginBottom 4 + wordMeta ~20 = 68
-// Divider height = marginVertical 4*2 + height 1 = 9
-const CARD_HEIGHT = 68;
-const DIVIDER_HEIGHT = 9;
+const SEARCH_MODES = ['exact', 'partial', 'prefix', 'suffix'];
 
 export default function DictionaryScreen() {
   const {
     theme,
     searchQuery,
     setSearchQuery,
+    searchMode,
+    setSearchMode,
     filteredEntries,
     t,
   } = useApp();
 
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
-  const [listHeight, setListHeight] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const itemsPerPage = listHeight > 0
-    ? Math.max(1, Math.floor((listHeight + DIVIDER_HEIGHT) / (CARD_HEIGHT + DIVIDER_HEIGHT)))
-    : 5;
-
-  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / itemsPerPage));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-
-  const paginatedEntries = filteredEntries.slice(
-    (safeCurrentPage - 1) * itemsPerPage,
-    safeCurrentPage * itemsPerPage
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
 
   const handleSelectEntry = (entry) => {
     setSelectedEntry(entry);
@@ -59,45 +40,58 @@ export default function DictionaryScreen() {
           onChangeText={setSearchQuery}
           placeholder={t('searchPlaceholder')}
         />
+        <View style={styles.modeRow}>
+          {SEARCH_MODES.map((mode) => (
+            <TouchableOpacity
+              key={mode}
+              onPress={() => setSearchMode(mode)}
+              style={[
+                styles.modeButton,
+                {
+                  backgroundColor: searchMode === mode ? theme.accent : theme.bgSecondary,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  { color: searchMode === mode ? '#fff' : theme.textSecondary },
+                ]}
+              >
+                {t(`searchMode_${mode}`)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-        {searchQuery
-          ? `${t('searchResults')} (${Math.max(0, filteredEntries.length - 1)})`
-          : `${t('recent')} (${Math.max(0, filteredEntries.length - 1)})`}
-      </Text>
-
-      <View
-        style={styles.listContainer}
-        onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
-      >
-        {paginatedEntries.length === 0 && searchQuery ? (
-          <Text style={[styles.noResults, { color: theme.textSecondary }]}>
-            {t('noResults', { query: searchQuery })}
+      {searchQuery ? (
+        <>
+          <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
+            {`${t('searchResults')} (${filteredEntries.length})`}
           </Text>
-        ) : (
-          <FlatList
-            data={paginatedEntries}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
-              <View>
-                <WordCard entry={item} onPress={() => handleSelectEntry(item)} />
-                {index < paginatedEntries.length - 1 && <Divider marginY={4} />}
-              </View>
-            )}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={false}
-          />
-        )}
-      </View>
 
-      <Pagination
-        currentPage={safeCurrentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        totalItems={filteredEntries.length}
-      />
+          {filteredEntries.length === 0 ? (
+            <Text style={[styles.noResults, { color: theme.textSecondary }]}>
+              {t('noResults', { query: searchQuery })}
+            </Text>
+          ) : (
+            <FlatList
+              data={filteredEntries}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item, index }) => (
+                <View>
+                  <WordCard entry={item} onPress={() => handleSelectEntry(item)} />
+                  {index < filteredEntries.length - 1 && <Divider marginY={4} />}
+                </View>
+              )}
+              style={styles.listContainer}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </>
+      ) : null}
 
       <Modal
         visible={showDetail}
@@ -149,6 +143,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
   },
+  modeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  modeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  modeButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   sectionHeader: {
     fontSize: 15,
     fontWeight: '500',
@@ -161,6 +170,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
+    paddingBottom: 16,
   },
   noResults: {
     textAlign: 'center',

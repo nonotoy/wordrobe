@@ -17,7 +17,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useApp } from '../context/AppContext';
 import { Divider } from '../components/UIComponents';
-import { CheckIcon, XIcon, FolderIcon, BooksIcon, RenameIcon, PictureIcon, EarthAsiaIcon, SimpleBookIcon } from '../components/Icons';
+import { CheckIcon, XIcon, FolderIcon, BooksIcon, TextInputLeftIcon, PictureIcon, EarthAsiaIcon, SimpleBookIcon } from '../components/Icons';
 import { resolveLanguageName, isValidISO639_3 } from '../utils/languages';
 
 export default function SettingsScreen() {
@@ -43,16 +43,6 @@ export default function SettingsScreen() {
   const [editingLanguages, setEditingLanguages] = useState(false);
   const [language1Input, setLanguage1Input] = useState('');
   const [language2Input, setLanguage2Input] = useState('');
-
-  const typeLabel = (type) => {
-    switch (type) {
-      case 'both': return t('both');
-      case 'dictionary': return t('dictionary');
-      case 'sentences': return t('sentences');
-      case 'localization': return t('localization');
-      default: return type;
-    }
-  };
 
   const handleSaveName = async () => {
     if (!dictionaryName.trim() || !currentDictionary) return;
@@ -107,7 +97,6 @@ export default function SettingsScreen() {
     if (!currentDictionary) return;
     await updateDictionary(currentDictionary.id, { iconImage: null });
   };
-
 
   const handleToggleDeleteMode = () => {
     if (deleteMode) {
@@ -172,7 +161,7 @@ export default function SettingsScreen() {
         setSelectedFile(result.assets[0]);
       }
     } catch (error) {
-      Alert.alert('エラー', 'ファイルの選択に失敗しました');
+      Alert.alert(t('error'), t('loadFailed'));
     }
   };
 
@@ -191,7 +180,7 @@ export default function SettingsScreen() {
       const sentencesCount = data.sentences?.length || 0;
 
       if (entriesCount === 0 && sentencesCount === 0) {
-        throw new Error('データが見つかりません。JSONの形式を確認してください。');
+        throw new Error(t('noDataFound'));
       }
 
       const newSource = {
@@ -230,30 +219,19 @@ export default function SettingsScreen() {
       setNewSourceName('');
       setSelectedFile(null);
       setShowAddSource(false);
-      Alert.alert('成功', `${entriesCount}件の単語と${sentencesCount}件の例文を読み込みました`);
+      Alert.alert(t('success'), t('loadComplete', { entries: entriesCount, sentences: sentencesCount }));
     } catch (error) {
-      Alert.alert('エラー', error.message || 'データソースの追加に失敗しました');
+      Alert.alert(t('error'), error.message || t('loadFailed'));
     } finally {
       setLoading(false);
     }
   };
-
 
   const sortedDataSources = [...dataSources].sort((a, b) => {
     if (a.type === 'localization' && b.type !== 'localization') return 1;
     if (a.type !== 'localization' && b.type === 'localization') return -1;
     return 0;
   });
-
-  const typeColors = (type) => {
-    switch (type) {
-      case 'both': return { bg: theme.accentLight, text: theme.accentText };
-      case 'dictionary': return { bg: theme.accentLight, text: theme.accentText };
-      case 'sentences': return { bg: theme.successLight, text: theme.successText };
-      case 'localization': return { bg: theme.warningLight, text: theme.warningText };
-      default: return { bg: theme.accentLight, text: theme.accentText };
-    }
-  };
 
   const handleEditSource = (source) => {
     setEditingSource(source);
@@ -282,7 +260,7 @@ export default function SettingsScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]} edges={[]}>
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            辞書が選択されていません
+            {t('noDictionaries')}
           </Text>
         </View>
       </SafeAreaView>
@@ -418,7 +396,7 @@ export default function SettingsScreen() {
                       <TextInput
                         value={editSourceName}
                         onChangeText={setEditSourceName}
-                        placeholder="名前"
+                        placeholder={t('name')}
                         placeholderTextColor={theme.textTertiary}
                         style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                         autoFocus
@@ -429,7 +407,7 @@ export default function SettingsScreen() {
                       <View style={styles.formButtons}>
                         <TouchableOpacity onPress={handleCancelSourceEdit}>
                           <Text style={[styles.cancelText, { color: theme.textSecondary }]}>
-                            キャンセル
+                            {t('cancel')}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -444,7 +422,7 @@ export default function SettingsScreen() {
                             }
                           ]}
                         >
-                          <Text style={styles.submitButtonText}>保存</Text>
+                          <Text style={styles.submitButtonText}>{t('save')}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -489,7 +467,7 @@ export default function SettingsScreen() {
           {/* Dictionary Name */}
           <View style={styles.section}>
             <View style={[styles.sectionTitleContainer, { marginBottom: 12 }]}>
-              <RenameIcon color={theme.textSecondary} size={16} />
+              <TextInputLeftIcon color={theme.textSecondary} size={16} />
               <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
                 {t('dictionaryName')}
               </Text>
@@ -695,14 +673,6 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 28,
   },
-  dictionaryName: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  dictionaryStats: {
-    fontSize: 15,
-  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -760,20 +730,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
-  typeButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  typeButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  typeButtonText: {
-    fontSize: 13,
-  },
   filePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -827,23 +783,8 @@ const styles = StyleSheet.create({
   sourceInfo: {
     flex: 1,
   },
-  sourceNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
   sourceName: {
     fontSize: 15,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '500',
   },
   sourceURL: {
     fontSize: 12,
@@ -872,44 +813,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   editLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  imagePickerContainer: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  imagePreview: {
-    marginBottom: 16,
-  },
-  previewImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-  },
-  previewIconPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  imageButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  imageButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  imageButtonTextSecondary: {
     fontSize: 14,
     fontWeight: '500',
   },

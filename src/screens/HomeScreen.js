@@ -10,14 +10,12 @@ import {
   Animated,
   PanResponder,
   Alert,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { SettingsIcon2, PlusIcon, XIcon, BooksIcon, SimpleBookIcon, FaviconIcon2 } from '../components/Icons';
-import { resolveLanguageName, isValidISO639_3, getLanguageByCode } from '../utils/languages';
+import { resolveLanguageName, isValidISO639_3 } from '../utils/languages';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const DELETE_BUTTON_WIDTH = 64;
 const SWIPE_THRESHOLD = DELETE_BUTTON_WIDTH + 10;
 
@@ -383,23 +381,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  logoIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
   settingsButton: {
     width: 44,
     height: 44,
@@ -431,10 +412,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    textAlign: 'center',
   },
   swipeContainer: {
     borderRadius: 12,
@@ -473,13 +450,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
-  },
-  dictionaryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   dictionaryIconImage: {
     width: 40,

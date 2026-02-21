@@ -1,25 +1,7 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { SearchIcon, XIcon, ChevronLeftIcon, ChevronRightIcon, StarIconCustom, MainIcon } from './Icons';
-
-export function Logo({ size = 'large', name = 'Wordrobe' }) {
-  const { theme } = useApp();
-  const isLarge = size === 'large';
-  const iconSize = isLarge ? 36 : 28;
-
-  return (
-    <View style={styles.logoContainer}>
-      <MainIcon color={theme.text} size={iconSize} />
-      <Text style={[
-        styles.logoText,
-        { color: theme.text, fontSize: isLarge ? 24 : 18 }
-      ]}>
-        {name}
-      </Text>
-    </View>
-  );
-}
+import { SearchIcon, XIcon, ChevronLeftIcon, ChevronRightIcon, StarIconCustom } from './Icons';
 
 export function SearchBar({ value, onChangeText, placeholder }) {
   const { theme } = useApp();
@@ -33,14 +15,19 @@ export function SearchBar({ value, onChangeText, placeholder }) {
         placeholder={placeholder}
         placeholderTextColor={theme.textTertiary}
         style={[styles.searchInput, { color: theme.text }]}
+        autoCorrect={false}
+        autoCapitalize="none"
+        spellCheck={false}
       />
-      {value ? (
-        <TouchableOpacity onPress={() => onChangeText('')} style={styles.clearButton}>
-          <View style={[styles.clearButtonInner, { backgroundColor: theme.textTertiary }]}>
-            <XIcon color={theme.bg} size={10} />
-          </View>
-        </TouchableOpacity>
-      ) : null}
+      <TouchableOpacity
+        onPress={() => onChangeText('')}
+        style={[styles.clearButton, { opacity: value ? 1 : 0 }]}
+        disabled={!value}
+      >
+        <View style={[styles.clearButtonInner, { backgroundColor: theme.textTertiary }]}>
+          <XIcon color={theme.bg} size={10} />
+        </View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -145,20 +132,6 @@ export function Toggle({ value, onValueChange }) {
 }
 
 const styles = StyleSheet.create({
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  logoDefault: {
-    backgroundColor: '#1e3a5f',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoText: {
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
