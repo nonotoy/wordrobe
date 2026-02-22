@@ -63,63 +63,88 @@ const EMPTY_DATA = { entries: [], sentences: [], favorites: [], dataSources: [] 
 const CHUNK_SIZE = 150000; // Safe size under the limit
 
 const saveDictData = async (id, data) => {
-  const json = JSON.stringify(data);
-  const compressed = LZString.compressToUTF16(json);
+  try {
+    const json = JSON.stringify(data);
+    const compressed = LZString.compressToUTF16(json);
 
-  // Delete old chunks first
-  const oldChunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
-  if (oldChunkCount) {
-    const count = parseInt(oldChunkCount, 10);
-    for (let i = 0; i < count; i++) {
-      await AsyncStorage.removeItem(`dict_data_${id}_${i}`);
+    // Split into chunks if needed
+    if (compressed.length > CHUNK_SIZE) {
+      const chunks = [];
+      for (let i = 0; i < compressed.length; i += CHUNK_SIZE) {
+        chunks.push(compressed.slice(i, i + CHUNK_SIZE));
+      }
+
+      // Save each chunk
+      for (let i = 0; i < chunks.length; i++) {
+        await AsyncStorage.setItem(`dict_data_${id}_${i}`, chunks[i]);
+      }
+
+      // Save chunk count LAST (acts as a marker that all chunks are saved)
+      await AsyncStorage.setItem(`dict_data_${id}_chunks`, chunks.length.toString());
+
+      // Clean up old single-key data if it exists
+      await AsyncStorage.removeItem(`dict_data_${id}`);
+    } else {
+      // Small enough to save as single key
+      await AsyncStorage.setItem(`dict_data_${id}`, compressed);
+
+      // Clean up old chunks if they exist
+      const oldChunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
+      if (oldChunkCount) {
+        const count = parseInt(oldChunkCount, 10);
+        for (let i = 0; i < count; i++) {
+          await AsyncStorage.removeItem(`dict_data_${id}_${i}`);
+        }
+        await AsyncStorage.removeItem(`dict_data_${id}_chunks`);
+      }
     }
-  }
-
-  // Split into chunks if needed
-  if (compressed.length > CHUNK_SIZE) {
-    const chunks = [];
-    for (let i = 0; i < compressed.length; i += CHUNK_SIZE) {
-      chunks.push(compressed.slice(i, i + CHUNK_SIZE));
-    }
-
-    // Save each chunk
-    for (let i = 0; i < chunks.length; i++) {
-      await AsyncStorage.setItem(`dict_data_${id}_${i}`, chunks[i]);
-    }
-
-    // Save chunk count
-    await AsyncStorage.setItem(`dict_data_${id}_chunks`, chunks.length.toString());
-  } else {
-    // Small enough to save as single key
-    await AsyncStorage.setItem(`dict_data_${id}`, compressed);
-    await AsyncStorage.removeItem(`dict_data_${id}_chunks`);
+  } catch (error) {
+    console.error(`Error saving dict data for ${id}:`, error);
+    throw error;
   }
 };
 
 const loadDictData = async (id) => {
-  // Check if chunked
-  const chunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
+  try {
+    // Check if chunked
+    const chunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
 
-  if (chunkCount) {
-    // Load chunks and reassemble
-    const count = parseInt(chunkCount, 10);
-    const chunks = [];
-    for (let i = 0; i < count; i++) {
-      const chunk = await AsyncStorage.getItem(`dict_data_${id}_${i}`);
-      if (chunk) chunks.push(chunk);
+    if (chunkCount) {
+      // Load chunks and reassemble
+      const count = parseInt(chunkCount, 10);
+      const chunks = [];
+      for (let i = 0; i < count; i++) {
+        const chunk = await AsyncStorage.getItem(`dict_data_${id}_${i}`);
+        if (!chunk) {
+          console.error(`Missing chunk ${i} for dictionary ${id}`);
+          return { ...EMPTY_DATA };
+        }
+        chunks.push(chunk);
+      }
+
+      if (chunks.length === 0) return { ...EMPTY_DATA };
+
+      const compressed = chunks.join('');
+      const json = LZString.decompressFromUTF16(compressed);
+      if (!json) {
+        console.error(`Decompression failed for dictionary ${id}`);
+        return { ...EMPTY_DATA };
+      }
+      return JSON.parse(json);
+    } else {
+      // Single key
+      const compressed = await AsyncStorage.getItem(`dict_data_${id}`);
+      if (!compressed) return { ...EMPTY_DATA };
+      const json = LZString.decompressFromUTF16(compressed);
+      if (!json) {
+        console.error(`Decompression failed for dictionary ${id}`);
+        return { ...EMPTY_DATA };
+      }
+      return JSON.parse(json);
     }
-
-    if (chunks.length === 0) return { ...EMPTY_DATA };
-
-    const compressed = chunks.join('');
-    const json = LZString.decompressFromUTF16(compressed);
-    return JSON.parse(json);
-  } else {
-    // Single key
-    const compressed = await AsyncStorage.getItem(`dict_data_${id}`);
-    if (!compressed) return { ...EMPTY_DATA };
-    const json = LZString.decompressFromUTF16(compressed);
-    return JSON.parse(json);
+  } catch (error) {
+    console.error(`Error loading dict data for ${id}:`, error);
+    return { ...EMPTY_DATA };
   }
 };
 
@@ -179,31 +204,40 @@ export function AppProvider({ children }) {
 
   // Migration: convert old single-key format to split format
   const migrateOldFormat = async (oldDictionaries, storedCurrentId) => {
-    const metas = oldDictionaries.map(d => getDictMeta(d));
+    try {
+      console.log(`Migrating ${oldDictionaries.length} dictionaries to new format...`);
+      const metas = oldDictionaries.map(d => getDictMeta(d));
 
-    // Save each dictionary's data separately (compressed)
-    for (const dict of oldDictionaries) {
-      const data = {
-        entries: dict.entries || [],
-        sentences: dict.sentences || [],
-        favorites: dict.favorites || [],
-        dataSources: dict.dataSources || [],
-      };
-      await saveDictData(dict.id, data);
-    }
+      // Save each dictionary's data separately (compressed)
+      for (const dict of oldDictionaries) {
+        const data = {
+          entries: dict.entries || [],
+          sentences: dict.sentences || [],
+          favorites: dict.favorites || [],
+          dataSources: dict.dataSources || [],
+        };
+        await saveDictData(dict.id, data);
+      }
 
-    // Save metadata
-    await AsyncStorage.setItem('dictionaries_meta', JSON.stringify(metas));
+      // Save metadata
+      await AsyncStorage.setItem('dictionaries_meta', JSON.stringify(metas));
 
-    // Remove old key
-    await AsyncStorage.removeItem('dictionaries');
+      // Remove old key ONLY after everything is saved successfully
+      await AsyncStorage.removeItem('dictionaries');
 
-    setDictionaries(metas);
+      setDictionaries(metas);
 
-    // Load current dictionary's data
-    if (storedCurrentId) {
-      const data = await loadDictData(storedCurrentId);
-      setCurrentDictData(data);
+      // Load current dictionary's data
+      if (storedCurrentId) {
+        const data = await loadDictData(storedCurrentId);
+        setCurrentDictData(data);
+      }
+
+      console.log('Migration completed successfully');
+    } catch (error) {
+      console.error('Migration failed:', error);
+      // Don't set state if migration failed
+      throw error;
     }
   };
 
@@ -234,11 +268,23 @@ export function AppProvider({ children }) {
       }
       if (storedCurrentDictionaryId) setCurrentDictionaryId(storedCurrentDictionaryId);
 
-      // Check for old format and migrate
-      if (storedOldDictionaries) {
-        const oldDictionaries = JSON.parse(storedOldDictionaries);
-        await migrateOldFormat(oldDictionaries, storedCurrentDictionaryId);
-        return;
+      // Check for old format and migrate (only if not empty)
+      if (storedOldDictionaries && !storedNewMeta) {
+        try {
+          const oldDictionaries = JSON.parse(storedOldDictionaries);
+          // Only migrate if there's actually data to migrate
+          if (Array.isArray(oldDictionaries) && oldDictionaries.length > 0) {
+            await migrateOldFormat(oldDictionaries, storedCurrentDictionaryId);
+            return;
+          } else {
+            // Empty or invalid old data, just remove it
+            await AsyncStorage.removeItem('dictionaries');
+          }
+        } catch (error) {
+          console.error('Error during migration:', error);
+          // If migration fails, remove the old key to prevent repeated failures
+          await AsyncStorage.removeItem('dictionaries');
+        }
       }
 
       // New format
