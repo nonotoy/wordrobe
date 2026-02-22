@@ -59,58 +59,58 @@ const getDictMeta = (dict) => {
 
 const EMPTY_DATA = { entries: [], sentences: [], favorites: [], dataSources: [] };
 
-// AsyncStorage has property limits, so we chunk into smaller pieces
-const CHUNK_SIZE = 10000; // Small chunks to avoid AsyncStorage property limits
+// Batch entries/sentences into smaller chunks to avoid AsyncStorage property limits
+const BATCH_SIZE = 500; // Number of entries/sentences per batch
 
 const saveDictData = async (id, data) => {
   try {
-    console.log(`Saving dict ${id}: ${data.entries?.length || 0} entries, ${data.sentences?.length || 0} sentences`);
+    const entries = data.entries || [];
+    const sentences = data.sentences || [];
+    const favorites = data.favorites || [];
+    const dataSources = data.dataSources || [];
 
-    const json = JSON.stringify(data);
-    console.log(`JSON size: ${json.length} characters`);
+    console.log(`Saving dict ${id}: ${entries.length} entries, ${sentences.length} sentences`);
 
-    const compressed = LZString.compressToUTF16(json);
-    console.log(`Compressed size: ${compressed.length} characters`);
+    // Save metadata (favorites and dataSources are small)
+    const metaData = { favorites, dataSources };
+    const metaJson = JSON.stringify(metaData);
+    const metaCompressed = LZString.compressToUTF16(metaJson);
+    await AsyncStorage.setItem(`dict_${id}_meta`, metaCompressed);
 
-    // Split into chunks if needed
-    if (compressed.length > CHUNK_SIZE) {
-      const chunks = [];
-      for (let i = 0; i < compressed.length; i += CHUNK_SIZE) {
-        chunks.push(compressed.slice(i, i + CHUNK_SIZE));
-      }
-
-      console.log(`Saving ${chunks.length} chunks for dict ${id}`);
-
-      // Save each chunk
-      for (let i = 0; i < chunks.length; i++) {
-        await AsyncStorage.setItem(`dict_data_${id}_${i}`, chunks[i]);
-      }
-
-      // Save chunk count LAST (acts as a marker that all chunks are saved)
-      await AsyncStorage.setItem(`dict_data_${id}_chunks`, chunks.length.toString());
-
-      // Clean up old single-key data if it exists
-      await AsyncStorage.removeItem(`dict_data_${id}`);
-
-      console.log(`Successfully saved dict ${id} in ${chunks.length} chunks`);
-    } else {
-      console.log(`Saving dict ${id} as single key`);
-
-      // Small enough to save as single key
-      await AsyncStorage.setItem(`dict_data_${id}`, compressed);
-
-      // Clean up old chunks if they exist
-      const oldChunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
-      if (oldChunkCount) {
-        const count = parseInt(oldChunkCount, 10);
-        for (let i = 0; i < count; i++) {
-          await AsyncStorage.removeItem(`dict_data_${id}_${i}`);
-        }
-        await AsyncStorage.removeItem(`dict_data_${id}_chunks`);
-      }
-
-      console.log(`Successfully saved dict ${id} as single key`);
+    // Save entries in batches
+    const entryBatchCount = Math.ceil(entries.length / BATCH_SIZE);
+    for (let i = 0; i < entryBatchCount; i++) {
+      const start = i * BATCH_SIZE;
+      const batch = entries.slice(start, start + BATCH_SIZE);
+      const batchJson = JSON.stringify(batch);
+      const batchCompressed = LZString.compressToUTF16(batchJson);
+      await AsyncStorage.setItem(`dict_${id}_entries_${i}`, batchCompressed);
     }
+    await AsyncStorage.setItem(`dict_${id}_entry_batches`, entryBatchCount.toString());
+
+    // Save sentences in batches
+    const sentenceBatchCount = Math.ceil(sentences.length / BATCH_SIZE);
+    for (let i = 0; i < sentenceBatchCount; i++) {
+      const start = i * BATCH_SIZE;
+      const batch = sentences.slice(start, start + BATCH_SIZE);
+      const batchJson = JSON.stringify(batch);
+      const batchCompressed = LZString.compressToUTF16(batchJson);
+      await AsyncStorage.setItem(`dict_${id}_sentences_${i}`, batchCompressed);
+    }
+    await AsyncStorage.setItem(`dict_${id}_sentence_batches`, sentenceBatchCount.toString());
+
+    // Clean up old format data
+    await AsyncStorage.removeItem(`dict_data_${id}`);
+    const oldChunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
+    if (oldChunkCount) {
+      const count = parseInt(oldChunkCount, 10);
+      for (let i = 0; i < count; i++) {
+        await AsyncStorage.removeItem(`dict_data_${id}_${i}`);
+      }
+      await AsyncStorage.removeItem(`dict_data_${id}_chunks`);
+    }
+
+    console.log(`Saved dict ${id}: ${entryBatchCount} entry batches, ${sentenceBatchCount} sentence batches`);
   } catch (error) {
     console.error(`Error saving dict data for ${id}:`, error);
     throw error;
@@ -119,11 +119,57 @@ const saveDictData = async (id, data) => {
 
 const loadDictData = async (id) => {
   try {
-    // Check if chunked
-    const chunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
+    // Check if new batch format exists
+    const entryBatchCountStr = await AsyncStorage.getItem(`dict_${id}_entry_batches`);
 
+    if (entryBatchCountStr) {
+      // Load from batch format
+      const metaCompressed = await AsyncStorage.getItem(`dict_${id}_meta`);
+      const metaJson = metaCompressed ? LZString.decompressFromUTF16(metaCompressed) : null;
+      const metaData = metaJson ? JSON.parse(metaJson) : { favorites: [], dataSources: [] };
+
+      // Load entries from batches
+      const entryBatchCount = parseInt(entryBatchCountStr, 10);
+      const entries = [];
+      for (let i = 0; i < entryBatchCount; i++) {
+        const batchCompressed = await AsyncStorage.getItem(`dict_${id}_entries_${i}`);
+        if (batchCompressed) {
+          const batchJson = LZString.decompressFromUTF16(batchCompressed);
+          if (batchJson) {
+            const batch = JSON.parse(batchJson);
+            entries.push(...batch);
+          }
+        }
+      }
+
+      // Load sentences from batches
+      const sentenceBatchCountStr = await AsyncStorage.getItem(`dict_${id}_sentence_batches`);
+      const sentenceBatchCount = sentenceBatchCountStr ? parseInt(sentenceBatchCountStr, 10) : 0;
+      const sentences = [];
+      for (let i = 0; i < sentenceBatchCount; i++) {
+        const batchCompressed = await AsyncStorage.getItem(`dict_${id}_sentences_${i}`);
+        if (batchCompressed) {
+          const batchJson = LZString.decompressFromUTF16(batchCompressed);
+          if (batchJson) {
+            const batch = JSON.parse(batchJson);
+            sentences.push(...batch);
+          }
+        }
+      }
+
+      console.log(`Loaded dict ${id}: ${entries.length} entries, ${sentences.length} sentences`);
+
+      return {
+        entries,
+        sentences,
+        favorites: metaData.favorites || [],
+        dataSources: metaData.dataSources || [],
+      };
+    }
+
+    // Fallback: try old chunk format
+    const chunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
     if (chunkCount) {
-      // Load chunks and reassemble
       const count = parseInt(chunkCount, 10);
       const chunks = [];
       for (let i = 0; i < count; i++) {
@@ -144,17 +190,17 @@ const loadDictData = async (id) => {
         return { ...EMPTY_DATA };
       }
       return JSON.parse(json);
-    } else {
-      // Single key
-      const compressed = await AsyncStorage.getItem(`dict_data_${id}`);
-      if (!compressed) return { ...EMPTY_DATA };
-      const json = LZString.decompressFromUTF16(compressed);
-      if (!json) {
-        console.error(`Decompression failed for dictionary ${id}`);
-        return { ...EMPTY_DATA };
-      }
-      return JSON.parse(json);
     }
+
+    // Fallback: try old single-key format
+    const compressed = await AsyncStorage.getItem(`dict_data_${id}`);
+    if (!compressed) return { ...EMPTY_DATA };
+    const json = LZString.decompressFromUTF16(compressed);
+    if (!json) {
+      console.error(`Decompression failed for dictionary ${id}`);
+      return { ...EMPTY_DATA };
+    }
+    return JSON.parse(json);
   } catch (error) {
     console.error(`Error loading dict data for ${id}:`, error);
     return { ...EMPTY_DATA };
@@ -162,7 +208,28 @@ const loadDictData = async (id) => {
 };
 
 const deleteDictData = async (id) => {
-  // Delete chunks if they exist
+  // Delete new batch format
+  await AsyncStorage.removeItem(`dict_${id}_meta`);
+
+  const entryBatchCount = await AsyncStorage.getItem(`dict_${id}_entry_batches`);
+  if (entryBatchCount) {
+    const count = parseInt(entryBatchCount, 10);
+    for (let i = 0; i < count; i++) {
+      await AsyncStorage.removeItem(`dict_${id}_entries_${i}`);
+    }
+    await AsyncStorage.removeItem(`dict_${id}_entry_batches`);
+  }
+
+  const sentenceBatchCount = await AsyncStorage.getItem(`dict_${id}_sentence_batches`);
+  if (sentenceBatchCount) {
+    const count = parseInt(sentenceBatchCount, 10);
+    for (let i = 0; i < count; i++) {
+      await AsyncStorage.removeItem(`dict_${id}_sentences_${i}`);
+    }
+    await AsyncStorage.removeItem(`dict_${id}_sentence_batches`);
+  }
+
+  // Delete old chunk format if exists
   const chunkCount = await AsyncStorage.getItem(`dict_data_${id}_chunks`);
   if (chunkCount) {
     const count = parseInt(chunkCount, 10);
@@ -172,7 +239,7 @@ const deleteDictData = async (id) => {
     await AsyncStorage.removeItem(`dict_data_${id}_chunks`);
   }
 
-  // Delete single key
+  // Delete old single key format
   await AsyncStorage.removeItem(`dict_data_${id}`);
 };
 
