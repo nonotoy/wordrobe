@@ -59,13 +59,18 @@ const getDictMeta = (dict) => {
 
 const EMPTY_DATA = { entries: [], sentences: [], favorites: [], dataSources: [] };
 
-// AsyncStorage has a ~200k character limit per key, so we chunk large data
-const CHUNK_SIZE = 150000; // Safe size under the limit
+// AsyncStorage has property limits, so we chunk into smaller pieces
+const CHUNK_SIZE = 10000; // Small chunks to avoid AsyncStorage property limits
 
 const saveDictData = async (id, data) => {
   try {
+    console.log(`Saving dict ${id}: ${data.entries?.length || 0} entries, ${data.sentences?.length || 0} sentences`);
+
     const json = JSON.stringify(data);
+    console.log(`JSON size: ${json.length} characters`);
+
     const compressed = LZString.compressToUTF16(json);
+    console.log(`Compressed size: ${compressed.length} characters`);
 
     // Split into chunks if needed
     if (compressed.length > CHUNK_SIZE) {
@@ -73,6 +78,8 @@ const saveDictData = async (id, data) => {
       for (let i = 0; i < compressed.length; i += CHUNK_SIZE) {
         chunks.push(compressed.slice(i, i + CHUNK_SIZE));
       }
+
+      console.log(`Saving ${chunks.length} chunks for dict ${id}`);
 
       // Save each chunk
       for (let i = 0; i < chunks.length; i++) {
@@ -84,7 +91,11 @@ const saveDictData = async (id, data) => {
 
       // Clean up old single-key data if it exists
       await AsyncStorage.removeItem(`dict_data_${id}`);
+
+      console.log(`Successfully saved dict ${id} in ${chunks.length} chunks`);
     } else {
+      console.log(`Saving dict ${id} as single key`);
+
       // Small enough to save as single key
       await AsyncStorage.setItem(`dict_data_${id}`, compressed);
 
@@ -97,6 +108,8 @@ const saveDictData = async (id, data) => {
         }
         await AsyncStorage.removeItem(`dict_data_${id}_chunks`);
       }
+
+      console.log(`Successfully saved dict ${id} as single key`);
     }
   } catch (error) {
     console.error(`Error saving dict data for ${id}:`, error);
